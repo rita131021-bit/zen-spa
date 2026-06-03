@@ -42,9 +42,9 @@ function runMigrations() {
 
 db.getConnection((err, connection) => {
   if (err) {
-    console.error('Error conectando a MySQL:', err.message);
+    console.error('❌ Error conectando a MySQL:', err.message);
   } else {
-    console.log('Conectado a MySQL correctamente');
+    console.log('✅ Conectado a MySQL correctamente');
     connection.release();
     runMigrations();
   }
@@ -84,16 +84,48 @@ app.use('/api/horarios', horariosRouter(db));
 app.use('/api/recordatorios', recordatoriosRouter(db));
 app.use('/api/chat', createChatRouter(db, io));
 
+// Health check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// 404
+app.use((req, res) => {
+  res.status(404).json({ error: 'Ruta no encontrada' });
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+  console.error('❌ Error:', err);
+  res.status(500).json({ error: err.message });
+});
+
 const PORT = process.env.PORT || 3001;
 
-server.listen(PORT, () => {
-  console.log('Servidor corriendo en http://localhost:' + PORT);
+server.listen(PORT, '127.0.0.1', () => {
+  console.log(`🚀 Servidor corriendo en http://127.0.0.1:${PORT}`);
+  console.log('\n📋 APIs disponibles:');
+  console.log('   GET  /api/clientes');
+  console.log('   POST /api/clientes');
+  console.log('   GET  /api/mascotas');
+  console.log('   POST /api/mascotas');
+  console.log('   GET  /api/servicios');
+  console.log('   POST /api/servicios');
+  console.log('   GET  /api/profesionales');
+  console.log('   GET  /api/caniles');
+  console.log('   GET  /api/turnos');
+  console.log('   POST /api/turnos');
+  console.log('   PUT  /api/turnos/:id');
+  console.log('   GET  /api/disponibilidad?fecha=2026-06-10');
+  console.log('   GET  /api/bloqueos');
+  console.log('   POST /api/bloqueos');
+  console.log('   GET  /health\n');
 
   const runJob = () => {
     runRecordatoriosJob(db)
       .then((result) => {
         if (result.creados > 0) {
-          console.log(`Recordatorios 24h generados: ${result.creados}`);
+          console.log(`📧 Recordatorios 24h generados: ${result.creados}`);
         }
       })
       .catch((err) => console.error('Job recordatorios:', err.message));
