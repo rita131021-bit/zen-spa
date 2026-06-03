@@ -16,6 +16,8 @@ function normalizeTime(value) {
   return String(value).slice(0, 5);
 }
 
+const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
+
 module.exports = (db) => {
   router.get('/', (req, res) => {
     const sql = `
@@ -47,59 +49,121 @@ module.exports = (db) => {
     try {
       const { cliente_id, mascota_id, servicio_id, profesional_id, canil_id, fecha, hora, observaciones } = req.body;
 
+      // Validaciones básicas
       if (!fecha || !hora) {
         return res.status(400).json({ error: 'Fecha y hora son obligatorias' });
       }
 
-      const horaCorta = normalizeTime(hora);
-      const [bloqueos, feriados, turnosMismaHora, caniles] = await Promise.all([
-        query(db, 'SELECT * FROM bloqueos WHERE fecha = ?', [fecha]),
-        query(db, 'SELECT * FROM feriados WHERE fecha = ? AND no_laborable = 1', [fecha]),
-        query(
-          db,
-          `SELECT id, profesional_id, canil_id, hora
-           FROM turnos
-           WHERE fecha = ? AND estado <> 'Cancelado'`,
-          [fecha]
-        ),
-        query(db, 'SELECT * FROM caniles WHERE activo = 1'),
-      ]);
+      if (!cliente_id || !mascota_id || !servicio_id) {
+        return res.status(400).json({ error: 'Cliente, mascota y servicio son obligatorios' });
+      }
 
-      const turnosEnHorario = turnosMismaHora.filter((turno) => normalizeTime(turno.hora) === horaCorta);
+      const horaCorta = normalizeTime(hora);
+
+      // ===== VALIDACIONES DE DISPONIBILIDAD =====
+      
+      // 1. Verificar si la fecha está bloqueada
+      const bloqueos = await query(db, 'SELECT * FROM bloqueos WHERE fecha = ?', [fecha]);
+      if (bloqueos.length > 0) {
+        return res.status(409).json({
+          error: 'No se puede reservar en esta fecha',
+          estado: 'Bloqueada',
+          razones: ['Fecha bloqueada: ' + (bloqueos[0].motivo || 'Sin especificar')],
+        });
+      }
+
+      // 2. Verificar si es feriado no laborable
+      const feriados = await query(db, 'SELECT * FROM feriados WHERE fecha = ? AND no_laborable = 1', [fecha]);
+      if (feriados.length > 0) {
+        return res.status(409).json({
+          error: 'No se puede reservar en feriado no laborable',
+          estado: 'Feriado',
+          razones: ['Feriado no laborable'],
+        });
+      }
+
+      // 3. Verificar horario disponible
+      const date = new Date(`${fecha}T12:00:00`);
+      const dia = dayNames[date.getDay()];
+      
+      const horarios = await query(db, 'SELECT * FROM horarios WHERE dia = ? AND hora = ?', [dia, hora]);
+      if (horarios.length > 0 && !horarios[0].disponible) {
+        return res.status(409).json({
+          error: 'Horario no disponible',
+          estado: 'No disponible',
+          razones: ['Horario no disponible en horarios semanales'],
+        });
+      }
+
+      // 4. Obtener turnos existentes en esa fecha y hora
+      const turnosExistentes = await query(
+        db,
+        `SELECT id, profesional_id, canil_id, hora, estado
+         FROM turnos
+         WHERE fecha = ? AND estado <> 'Cancelado'`,
+        [fecha]
+      );
+
+      const turnosEnHorario = turnosExistentes.filter((turno) => normalizeTime(turno.hora) === horaCorta);
       const razones = [];
 
-      if (bloqueos.length > 0) razones.push('Fecha bloqueada');
-      if (feriados.length > 0) razones.push('Feriado no laborable');
-      if (profesional_id && turnosEnHorario.some((turno) => Number(turno.profesional_id) === Number(profesional_id))) {
-        razones.push('Profesional ocupado');
-      }
-      if (canil_id && turnosEnHorario.some((turno) => Number(turno.canil_id) === Number(canil_id))) {
-        razones.push('Canil ocupado');
-      }
-
-      const canilesActivos = caniles.length;
-      const canilesOcupados = new Set(turnosEnHorario.filter((turno) => turno.canil_id).map((turno) => Number(turno.canil_id))).size;
-      if (!canil_id && canilesActivos > 0 && canilesOcupados >= canilesActivos) {
-        razones.push('Cupos completos');
+      // 5. Verificar si profesional está ocupado
+      if (profesional_id) {
+        const profesionalOcupado = turnosEnHorario.some(
+          (turno) => Number(turno.profesional_id) === Number(profesional_id)
+        );
+        if (profesionalOcupado) {
+          razones.push('Profesional ocupado en este horario');
+        }
       }
 
+      // 6. Verificar si canil está ocupado
+      if (canil_id) {
+        const canilOcupado = turnosEnHorario.some(
+          (turno) => Number(turno.canil_id) === Number(canil_id)
+        );
+        if (canilOcupado) {
+          razones.push('Canil ocupado en este horario');
+        }
+      }
+
+      // 7. Verificar cupos de caniles (si no se especifica canil pero requiere)
+      if (!canil_id) {
+        const servicio = await query(db, 'SELECT * FROM servicios WHERE id = ?', [servicio_id]);
+        if (servicio.length > 0 && servicio[0].requiere_canil) {
+          const caniles = await query(db, 'SELECT * FROM caniles WHERE activo = 1');
+          const canilesActivos = caniles.length;
+          const canilesOcupados = new Set(
+            turnosEnHorario
+              .filter((turno) => turno.canil_id)
+              .map((turno) => Number(turno.canil_id))
+          ).size;
+
+          if (canilesActivos > 0 && canilesOcupados >= canilesActivos) {
+            razones.push('Cupos completos - todos los caniles ocupados');
+          }
+        }
+      }
+
+      // Si hay razones, rechazar
       if (razones.length > 0) {
         return res.status(409).json({
           error: 'No se puede reservar este horario',
-          estado: razones.includes('Cupos completos') ? 'Cupos completos' : 'No disponible',
+          estado: 'No disponible',
           razones,
         });
       }
 
+      // ===== CREAR TURNO =====
       const sql = `
         INSERT INTO turnos
-          (cliente_id, mascota_id, servicio_id, profesional_id, canil_id, fecha, hora, observaciones)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          (cliente_id, mascota_id, servicio_id, profesional_id, canil_id, fecha, hora, observaciones, estado, pago)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pendiente', 'Pendiente')
       `;
 
       db.query(
         sql,
-        [cliente_id, mascota_id, servicio_id, profesional_id, canil_id || null, fecha, hora, observaciones],
+        [cliente_id, mascota_id, servicio_id, profesional_id || null, canil_id || null, fecha, hora, observaciones || null],
         async (err, result) => {
           if (err) return res.status(500).json({ error: err.message });
 
@@ -109,7 +173,7 @@ module.exports = (db) => {
           try {
             const detalle = await query(
               db,
-              `SELECT t.fecha, t.hora,
+              `SELECT t.id, t.fecha, t.hora,
                 c.nombre as cliente_nombre, c.whatsapp as cliente_whatsapp,
                 m.nombre as mascota_nombre,
                 s.nombre as servicio_nombre,
@@ -138,31 +202,62 @@ module.exports = (db) => {
             console.error('Recordatorio de confirmacion:', recordatorioErr.message);
           }
 
-          res.json({
-            mensaje: 'Turno creado correctamente',
+          res.status(201).json({
+            mensaje: '✅ Turno creado correctamente',
             id: turnoId,
             whatsapp_url,
           });
         }
       );
     } catch (err) {
+      console.error('Error al crear turno:', err);
       res.status(500).json({ error: err.message });
     }
   });
 
   router.put('/:id', (req, res) => {
     const { estado, pago } = req.body;
-    const sql = 'UPDATE turnos SET estado = ?, pago = ? WHERE id = ?';
-    db.query(sql, [estado, pago, req.params.id], (err) => {
+    
+    if (!estado && !pago) {
+      return res.status(400).json({ error: 'Estado o pago es obligatorio' });
+    }
+
+    const updates = [];
+    const params = [];
+
+    if (estado) {
+      // Validar que el estado sea válido
+      const estadosValidos = ['Pendiente', 'Confirmado', 'Completado', 'Cancelado'];
+      if (!estadosValidos.includes(estado)) {
+        return res.status(400).json({ error: `Estado inválido. Debe ser uno de: ${estadosValidos.join(', ')}` });
+      }
+      updates.push('estado = ?');
+      params.push(estado);
+    }
+
+    if (pago) {
+      // Validar que el pago sea válido
+      const pagosValidos = ['Pendiente', 'Sena', 'Pagado'];
+      if (!pagosValidos.includes(pago)) {
+        return res.status(400).json({ error: `Pago inválido. Debe ser uno de: ${pagosValidos.join(', ')}` });
+      }
+      updates.push('pago = ?');
+      params.push(pago);
+    }
+
+    params.push(req.params.id);
+    const sql = `UPDATE turnos SET ${updates.join(', ')} WHERE id = ?`;
+
+    db.query(sql, params, (err) => {
       if (err) return res.status(500).json({ error: err.message });
-      res.json({ mensaje: 'Turno actualizado correctamente' });
+      res.json({ mensaje: '✅ Turno actualizado correctamente' });
     });
   });
 
   router.delete('/:id', (req, res) => {
     db.query('DELETE FROM turnos WHERE id = ?', [req.params.id], (err) => {
       if (err) return res.status(500).json({ error: err.message });
-      res.json({ mensaje: 'Turno eliminado correctamente' });
+      res.json({ mensaje: '✅ Turno eliminado correctamente' });
     });
   });
 
