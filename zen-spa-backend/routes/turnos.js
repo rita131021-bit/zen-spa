@@ -63,7 +63,7 @@ module.exports = (db) => {
       // ===== VALIDACIONES DE DISPONIBILIDAD =====
       
       // 1. Verificar si la fecha está bloqueada
-      const bloqueos = await query(db, 'SELECT * FROM bloqueos WHERE fecha = ?', [fecha]);
+      const bloqueos = await query(db, 'SELECT * FROM bloqueos_calendario WHERE fecha = ?', [fecha]);
       if (bloqueos.length > 0) {
         return res.status(409).json({
           error: 'No se puede reservar en esta fecha',
@@ -261,5 +261,29 @@ module.exports = (db) => {
     });
   });
 
+
+  // POSTERGAR TURNO — cambia fecha y hora
+  router.patch('/:id/postergar', (req, res) => {
+    const { fecha, hora, motivo } = req.body;
+    if (!fecha || !hora) return res.status(400).json({ error: 'Nueva fecha y hora son obligatorias' });
+    const sql = "UPDATE turnos SET fecha = ?, hora = ?, estado = 'Pendiente', observaciones = CONCAT(IFNULL(observaciones,''), ' | Postergado: ', ?) WHERE id = ?";
+    db.query(sql, [fecha, hora, motivo || 'Sin motivo', req.params.id], (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ mensaje: '✅ Turno postergado correctamente' });
+    });
+  });
+
+  // CANCELAR TURNO
+  router.patch('/:id/cancelar', (req, res) => {
+    const { motivo } = req.body;
+    const sql = "UPDATE turnos SET estado = 'Cancelado', observaciones = CONCAT(IFNULL(observaciones,''), ' | Cancelado: ', ?) WHERE id = ?";
+    db.query(sql, [motivo || 'Cancelado por administrador', req.params.id], (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ mensaje: '✅ Turno cancelado correctamente' });
+    });
+  });
+
   return router;
 };
+
+// Este archivo fue parchado — agregar endpoint postergar al router antes del return

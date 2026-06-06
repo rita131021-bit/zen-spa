@@ -1,16 +1,7 @@
 "use client"
 
 import { FormEvent, useEffect, useMemo, useState } from "react"
-import RealTurnsTable from "@/components/RealTurnsTable"
-import {
-  API_BASE,
-  Cliente,
-  DisponibilidadSlot,
-  Mascota,
-  Profesional,
-  Servicio,
-  Turno,
-} from "@/lib/api"
+import { API_BASE, Cliente, DisponibilidadSlot, Mascota, Profesional, Servicio, Turno } from "@/lib/api"
 
 type TurnosManagerProps = {
   initialTurnos?: Turno[]
@@ -21,10 +12,19 @@ const emptyForm = {
   mascota_id: "",
   servicio_id: "",
   profesional_id: "",
-  canil_id: "",
   fecha: "",
   hora: "",
   observaciones: "",
+}
+
+function estadoPill(estado: string) {
+  const map: Record<string, string> = {
+    Pendiente: "pill yellow",
+    Confirmado: "pill green",
+    Completado: "pill blue",
+    Cancelado: "pill gray",
+  }
+  return map[estado] || "pill gray"
 }
 
 export default function TurnosManager({ initialTurnos = [] }: TurnosManagerProps) {
@@ -41,12 +41,35 @@ export default function TurnosManager({ initialTurnos = [] }: TurnosManagerProps
   const [slots, setSlots] = useState<DisponibilidadSlot[]>([])
   const [slotHint, setSlotHint] = useState("")
   const [whatsappUrl, setWhatsappUrl] = useState<string | null>(null)
+  const [descuentoInfo, setDescuentoInfo] = useState<{ porcentaje: number; nombre: string } | null>(null)
+
+  // Modal postergar
+  const [postergando, setPostergando] = useState<Turno | null>(null)
+  const [nuevaFecha, setNuevaFecha] = useState("")
+  const [nuevaHora, setNuevaHora] = useState("")
+  const [motivoAccion, setMotivoAccion] = useState("")
+
+  // Filtro tabla
+  const [filtroEstado, setFiltroEstado] = useState("todos")
+  const [busqueda, setBusqueda] = useState("")
 
   const selectedServicio = servicios.find((s) => String(s.id) === form.servicio_id)
   const mascotasFiltradas = useMemo(
     () => mascotas.filter((m) => String(m.cliente_id) === form.cliente_id),
     [mascotas, form.cliente_id]
   )
+
+  const turnosFiltrados = useMemo(() => {
+    return turnos.filter((t) => {
+      const matchEstado = filtroEstado === "todos" || t.estado === filtroEstado
+      const q = busqueda.toLowerCase()
+      const matchBusqueda = !q ||
+        String((t as any).cliente_nombre || "").toLowerCase().includes(q) ||
+        String((t as any).mascota_nombre || "").toLowerCase().includes(q) ||
+        String((t as any).servicio_nombre || "").toLowerCase().includes(q)
+      return matchEstado && matchBusqueda
+    })
+  }, [turnos, filtroEstado, busqueda])
 
   async function loadCatalogs() {
     const [turnosRes, clientesRes, mascotasRes, serviciosRes, profesionalesRes] = await Promise.all([
@@ -56,7 +79,6 @@ export default function TurnosManager({ initialTurnos = [] }: TurnosManagerProps
       fetch(`${API_BASE}/api/servicios`, { cache: "no-store" }),
       fetch(`${API_BASE}/api/profesionales`, { cache: "no-store" }),
     ])
-
     if (turnosRes.ok) setTurnos(await turnosRes.json())
     if (clientesRes.ok) setClientes(await clientesRes.json())
     if (mascotasRes.ok) setMascotas(await mascotasRes.json())
@@ -66,69 +88,63 @@ export default function TurnosManager({ initialTurnos = [] }: TurnosManagerProps
       setProfesionales(list)
       const romina = list.find((p) => p.nombre?.toLowerCase().includes("romina"))
       if (romina && !form.profesional_id) {
-        setForm((current) => ({ ...current, profesional_id: String(romina.id) }))
+        setForm((c) => ({ ...c, profesional_id: String(romina.id) }))
       }
     }
     setLoading(false)
   }
 
-  useEffect(() => {
-    loadCatalogs()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  useEffect(() => { loadCatalogs() }, [])
 
+  // Disponibilidad al cambiar fecha
   useEffect(() => {
-    if (typeof window === "undefined") return
-    if (window.location.hash !== "#nuevo-turno") return
-    const target = document.getElementById("nuevo-turno")
-    target?.scrollIntoView({ behavior: "smooth", block: "start" })
-    const firstField = target?.querySelector<HTMLElement>("select, input, textarea")
-    firstField?.focus()
-  }, [])
-
-  useEffect(() => {
-    if (!form.fecha) {
-      setSlots([])
-      setSlotHint("")
-      return
-    }
-
+    if (!form.fecha) { setSlots([]); setSlotHint(""); return }
     const params = new URLSearchParams({ fecha: form.fecha })
     if (form.profesional_id) params.set("profesional_id", form.profesional_id)
-
-    fetch(`${API_BASE}/api/disponibilidad?${params.toString()}`, { cache: "no-store" })
-      .then((res) => (res.ok ? res.json() : null))
+    fetch(`${API_BASE}/api/disponibilidad?${params}`, { cache: "no-store" })
+      .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         if (!data?.slots) return
         setSlots(data.slots)
-        const libres = data.slots.filter((slot: DisponibilidadSlot) => slot.disponible).length
-        if (data.bloqueada) setSlotHint("Fecha bloqueada: no se pueden crear turnos.")
-        else if (data.noLaborable) setSlotHint("Feriado no laborable.")
-        else setSlotHint(`${libres} horario(s) disponible(s) para esta fecha.`)
+        const libres = data.slots.filter((s: DisponibilidadSlot) => s.disponible).length
+        if (data.bloqueada) setSlotHint("⛔ Fecha bloqueada: no se pueden crear turnos.")
+        else if (data.noLaborable) setSlotHint("🗓️ Feriado no laborable.")
+        else setSlotHint(`✅ ${libres} horario(s) disponible(s)`)
       })
       .catch(() => setSlotHint(""))
   }, [form.fecha, form.profesional_id])
 
+  // Descuento automático al seleccionar cliente
+  useEffect(() => {
+    if (!form.cliente_id) { setDescuentoInfo(null); return }
+    fetch(`${API_BASE}/api/descuentos/cliente/${form.cliente_id}`, { method: "POST" })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.porcentaje > 0) {
+          setDescuentoInfo({ porcentaje: data.porcentaje, nombre: data.descuento_aplicable?.nombre || "" })
+        } else {
+          setDescuentoInfo(null)
+        }
+      })
+      .catch(() => setDescuentoInfo(null))
+  }, [form.cliente_id])
+
   function updateField(field: keyof typeof emptyForm, value: string) {
-    setForm((current) => {
-      const next = { ...current, [field]: value }
+    setForm((c) => {
+      const next = { ...c, [field]: value }
       if (field === "cliente_id") next.mascota_id = ""
       return next
     })
   }
 
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault()
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
     setSaving(true)
-    setMessage("")
-    setError("")
-
+    setMessage(""); setError("")
     if (!form.cliente_id || !form.mascota_id || !form.servicio_id || !form.fecha || !form.hora) {
       setError("Completá cliente, mascota, servicio, fecha y hora.")
-      setSaving(false)
-      return
+      setSaving(false); return
     }
-
     try {
       const body: Record<string, unknown> = {
         cliente_id: Number(form.cliente_id),
@@ -139,171 +155,130 @@ export default function TurnosManager({ initialTurnos = [] }: TurnosManagerProps
         hora: form.hora,
         observaciones: form.observaciones || null,
       }
-      if (form.canil_id) body.canil_id = Number(form.canil_id)
-
       const response = await fetch(`${API_BASE}/api/turnos`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       })
-
       const data = await response.json().catch(() => ({}))
-
       if (!response.ok) {
         const razones = Array.isArray(data.razones) ? data.razones.join(". ") : ""
-        setError(data.error ? `${data.error}${razones ? ` (${razones})` : ""}` : "No se pudo crear el turno")
-        setSaving(false)
-        return
+        setError(`${data.error || "No se pudo crear el turno"}${razones ? ` (${razones})` : ""}`)
+        setSaving(false); return
       }
-
-      setMessage(
-        data.whatsapp_url
-          ? "Turno creado. Se genero la confirmacion por WhatsApp (ver enlace abajo)."
-          : "Turno creado correctamente"
-      )
-      if (data.whatsapp_url) {
-        setWhatsappUrl(data.whatsapp_url as string)
-      }
-      setForm((current) => ({
-        ...emptyForm,
-        profesional_id: current.profesional_id,
-      }))
+      setMessage("✅ Turno creado correctamente")
+      if (data.whatsapp_url) setWhatsappUrl(data.whatsapp_url)
+      setForm((c) => ({ ...emptyForm, profesional_id: c.profesional_id }))
       await loadCatalogs()
     } catch {
-      setError("No se pudo conectar con el backend. Verificá que esté corriendo en el puerto 3001.")
+      setError("No se pudo conectar con el backend.")
     } finally {
       setSaving(false)
     }
   }
 
+  async function handleCancelar(turno: Turno) {
+    if (!confirm(`¿Cancelar turno de ${(turno as any).mascota_nombre || ""}?`)) return
+    const motivo = prompt("Motivo de cancelación (opcional):") || "Cancelado por administrador"
+    const res = await fetch(`${API_BASE}/api/turnos/${turno.id}/cancelar`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ motivo }),
+    })
+    if (res.ok) { await loadCatalogs() }
+    else { alert("No se pudo cancelar el turno") }
+  }
+
+  async function handlePosterguar() {
+    if (!postergando || !nuevaFecha || !nuevaHora) { alert("Fecha y hora son obligatorias"); return }
+    const res = await fetch(`${API_BASE}/api/turnos/${postergando.id}/postergar`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fecha: nuevaFecha, hora: nuevaHora, motivo: motivoAccion }),
+    })
+    if (res.ok) {
+      setPostergando(null); setNuevaFecha(""); setNuevaHora(""); setMotivoAccion("")
+      await loadCatalogs()
+    } else { alert("No se pudo postergar el turno") }
+  }
+
+  async function handleCambiarEstado(id: number, estado: string) {
+    await fetch(`${API_BASE}/api/turnos/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estado }),
+    })
+    await loadCatalogs()
+  }
+
   return (
     <>
+      {/* FORMULARIO NUEVO TURNO */}
       <section className="panel-card block-form" id="nuevo-turno">
         <h3>Nuevo turno</h3>
+        {descuentoInfo && (
+          <div style={{ padding: "10px 14px", marginBottom: "12px", borderRadius: "7px", background: "rgba(250,204,21,0.15)", color: "#facc15", fontSize: "13px", border: "1px solid rgba(250,204,21,0.4)" }}>
+            🎉 {descuentoInfo.nombre}: <strong>{descuentoInfo.porcentaje}% de descuento</strong> aplicado automáticamente
+          </div>
+        )}
         <form className="form-grid" onSubmit={handleSubmit}>
-          <label>
-            Cliente
-            <select
-              required
-              value={form.cliente_id}
-              onChange={(e) => updateField("cliente_id", e.target.value)}
-            >
+          <label>Cliente
+            <select required value={form.cliente_id} onChange={(e) => updateField("cliente_id", e.target.value)}>
               <option value="">Seleccionar cliente</option>
-              {clientes.map((cliente) => (
-                <option key={cliente.id} value={cliente.id}>
-                  {cliente.nombre}
-                </option>
-              ))}
+              {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
             </select>
           </label>
 
-          <label>
-            Mascota
-            <select
-              required
-              value={form.mascota_id}
-              onChange={(e) => updateField("mascota_id", e.target.value)}
-              disabled={!form.cliente_id}
-            >
+          <label>Mascota
+            <select required value={form.mascota_id} onChange={(e) => updateField("mascota_id", e.target.value)} disabled={!form.cliente_id}>
               <option value="">Seleccionar mascota</option>
-              {mascotasFiltradas.map((mascota) => (
-                <option key={mascota.id} value={mascota.id}>
-                  {mascota.nombre}
-                  {mascota.especie ? ` (${mascota.especie})` : ""}
-                </option>
+              {mascotasFiltradas.map((m) => (
+                <option key={m.id} value={m.id}>{m.nombre}{m.especie ? ` (${m.especie})` : ""}</option>
               ))}
             </select>
           </label>
 
-          <label>
-            Servicio
-            <select
-              required
-              value={form.servicio_id}
-              onChange={(e) => updateField("servicio_id", e.target.value)}
-            >
+          <label>Servicio
+            <select required value={form.servicio_id} onChange={(e) => updateField("servicio_id", e.target.value)}>
               <option value="">Seleccionar servicio</option>
-              {servicios
-                .filter((servicio) => Boolean(servicio.activo))
-                .map((servicio) => (
-                  <option key={servicio.id} value={servicio.id}>
-                    {servicio.nombre}
-                    {servicio.categoria ? ` — ${servicio.categoria}` : ""}
-                  </option>
-                ))}
+              {servicios.filter((s) => Boolean(s.activo)).map((s) => (
+                <option key={s.id} value={s.id}>{s.nombre}{s.categoria ? ` — ${s.categoria}` : ""}</option>
+              ))}
             </select>
           </label>
 
-          <label>
-            Profesional
-            <select
-              value={form.profesional_id}
-              onChange={(e) => updateField("profesional_id", e.target.value)}
-            >
+          <label>Profesional
+            <select value={form.profesional_id} onChange={(e) => updateField("profesional_id", e.target.value)}>
               <option value="">Sin asignar</option>
-              {profesionales
-                .filter((p) => p.activo !== 0 && p.activo !== false)
-                .map((profesional) => (
-                  <option key={profesional.id} value={profesional.id}>
-                    {profesional.nombre}
-                  </option>
-                ))}
+              {profesionales.filter((p) => p.activo !== 0 && p.activo !== false).map((p) => (
+                <option key={p.id} value={p.id}>{p.nombre}</option>
+              ))}
             </select>
           </label>
 
-          <label>
-            Fecha
-            <input
-              type="date"
-              required
-              value={form.fecha}
-              onChange={(e) => updateField("fecha", e.target.value)}
-            />
+          <label>Fecha
+            <input type="date" required value={form.fecha} onChange={(e) => updateField("fecha", e.target.value)} />
           </label>
 
-          <label>
-            Hora
+          <label>Hora
             {slots.length > 0 ? (
-              <select
-                required
-                value={form.hora}
-                onChange={(e) => updateField("hora", e.target.value)}
-              >
+              <select required value={form.hora} onChange={(e) => updateField("hora", e.target.value)}>
                 <option value="">Seleccionar horario</option>
                 {slots.map((slot) => (
                   <option key={slot.hora} value={slot.hora} disabled={!slot.disponible}>
-                    {slot.hora} — {slot.disponible ? "Disponible" : slot.estado}
-                    {!slot.disponible && slot.razones?.length ? ` (${slot.razones.join(", ")})` : ""}
+                    {slot.hora} — {slot.disponible ? "✅ Disponible" : `❌ ${slot.estado || "Ocupado"}`}
                   </option>
                 ))}
               </select>
             ) : (
-              <input
-                type="time"
-                required
-                value={form.hora}
-                onChange={(e) => updateField("hora", e.target.value)}
-              />
+              <input type="time" required value={form.hora} onChange={(e) => updateField("hora", e.target.value)} />
             )}
           </label>
-          {slotHint && <p className="tone-purple">{slotHint}</p>}
 
-          {selectedServicio?.requiere_canil ? (
-            <label>
-              Canil
-              <select value={form.canil_id} onChange={(e) => updateField("canil_id", e.target.value)}>
-                <option value="">Asignar automáticamente</option>
-              </select>
-            </label>
-          ) : null}
+          {slotHint && <p className={slotHint.startsWith("⛔") ? "tone-red" : "tone-purple"} style={{ gridColumn: "1/-1" }}>{slotHint}</p>}
 
-          <label>
-            Observaciones
-            <textarea
-              value={form.observaciones}
-              onChange={(e) => updateField("observaciones", e.target.value)}
-              placeholder="Notas internas del turno"
-            />
+          <label style={{ gridColumn: "1/-1" }}>Observaciones
+            <textarea value={form.observaciones} onChange={(e) => updateField("observaciones", e.target.value)} placeholder="Notas internas" />
           </label>
 
           <div className="button-row">
@@ -314,27 +289,115 @@ export default function TurnosManager({ initialTurnos = [] }: TurnosManagerProps
         </form>
         {message && <p className="tone-green">{message}</p>}
         {whatsappUrl && (
-          <p>
-            <a href={whatsappUrl} target="_blank" rel="noreferrer" className="outline-button yellow">
-              Abrir confirmacion en WhatsApp
-            </a>
-          </p>
+          <a href={whatsappUrl} target="_blank" rel="noreferrer" className="outline-button yellow" style={{ display: "inline-block", marginTop: "8px" }}>
+            💬 Confirmar por WhatsApp
+          </a>
         )}
         {error && <p className="tone-red">{error}</p>}
       </section>
 
-      {loading ? (
-        <section className="panel-card table-card">
-          <h3>Control de Reservas y Estados</h3>
-          <p>Cargando turnos desde la base de datos...</p>
-        </section>
-      ) : turnos.length ? (
-        <RealTurnsTable title="Control de Reservas y Estados" turns={turnos} />
-      ) : (
-        <section className="panel-card table-card">
-          <h3>Control de Reservas y Estados</h3>
-          <p>No hay turnos registrados. Creá el primero con el formulario de arriba.</p>
-        </section>
+      {/* TABLA DE TURNOS */}
+      <section className="panel-card table-card">
+        <div style={{ display: "flex", gap: "12px", marginBottom: "16px", flexWrap: "wrap", alignItems: "center" }}>
+          <h3 style={{ margin: 0, flex: 1 }}>Control de Reservas</h3>
+          <input type="text" placeholder="Buscar cliente, mascota..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} style={{ padding: "6px 10px", fontSize: "13px", width: "200px" }} />
+          <select value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)} style={{ padding: "6px 10px", fontSize: "13px" }}>
+            <option value="todos">Todos</option>
+            <option value="Pendiente">Pendiente</option>
+            <option value="Confirmado">Confirmado</option>
+            <option value="Completado">Completado</option>
+            <option value="Cancelado">Cancelado</option>
+          </select>
+        </div>
+
+        {loading ? (
+          <p>Cargando turnos...</p>
+        ) : turnosFiltrados.length === 0 ? (
+          <p style={{ color: "var(--muted)" }}>No hay turnos{filtroEstado !== "todos" ? ` con estado "${filtroEstado}"` : ""}.</p>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha / Hora</th>
+                <th>Cliente</th>
+                <th>Mascota</th>
+                <th>Servicio</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {turnosFiltrados.map((turno) => (
+                <tr key={turno.id}>
+                  <td style={{ fontSize: "12px" }}>
+                    <div style={{ fontWeight: "600" }}>{String(turno.fecha).slice(0, 10)}</div>
+                    <div style={{ color: "var(--muted)" }}>{String(turno.hora).slice(0, 5)}</div>
+                  </td>
+                  <td style={{ fontSize: "13px" }}>{(turno as any).cliente_nombre || "-"}</td>
+                  <td style={{ fontSize: "13px" }}>{(turno as any).mascota_nombre || "-"}</td>
+                  <td style={{ fontSize: "12px" }}>{(turno as any).servicio_nombre || "-"}</td>
+                  <td>
+                    <select
+                      value={turno.estado}
+                      onChange={(e) => handleCambiarEstado(turno.id, e.target.value)}
+                      className={estadoPill(turno.estado)}
+                      style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: "12px", color: "inherit" }}
+                    >
+                      <option value="Pendiente">Pendiente</option>
+                      <option value="Confirmado">Confirmado</option>
+                      <option value="Completado">Completado</option>
+                      <option value="Cancelado">Cancelado</option>
+                    </select>
+                  </td>
+                  <td style={{ display: "flex", gap: "6px" }}>
+                    {turno.estado !== "Cancelado" && turno.estado !== "Completado" && (
+                      <>
+                        <button
+                          onClick={() => { setPostergando(turno); setNuevaFecha(String(turno.fecha).slice(0, 10)); setNuevaHora(String(turno.hora).slice(0, 5)); }}
+                          title="Postergar"
+                          style={{ padding: "4px 8px", fontSize: "12px", background: "rgba(126,34,206,0.3)", border: "1px solid rgba(126,34,206,0.5)", borderRadius: "4px", cursor: "pointer", color: "#e9d5ff" }}
+                        >📅</button>
+                        <button
+                          onClick={() => handleCancelar(turno)}
+                          title="Cancelar"
+                          style={{ padding: "4px 8px", fontSize: "12px", background: "rgba(239,68,68,0.3)", border: "1px solid rgba(239,68,68,0.5)", borderRadius: "4px", cursor: "pointer", color: "#fca5a5" }}
+                        >✕</button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      {/* MODAL POSTERGAR */}
+      {postergando && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ background: "var(--card)", borderRadius: "12px", padding: "28px", width: "380px", display: "grid", gap: "14px" }}>
+            <h3 style={{ margin: 0 }}>📅 Postergar turno</h3>
+            <p style={{ margin: 0, fontSize: "13px", color: "var(--muted)" }}>
+              {(postergando as any).mascota_nombre} — {(postergando as any).servicio_nombre}
+            </p>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px" }}>
+              Nueva fecha
+              <input type="date" value={nuevaFecha} onChange={(e) => setNuevaFecha(e.target.value)} />
+            </label>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px" }}>
+              Nueva hora
+              <input type="time" value={nuevaHora} onChange={(e) => setNuevaHora(e.target.value)} />
+            </label>
+            <label style={{ display: "grid", gap: "6px", fontSize: "13px" }}>
+              Motivo (opcional)
+              <input type="text" value={motivoAccion} onChange={(e) => setMotivoAccion(e.target.value)} placeholder="Ej: Solicitud del cliente" />
+            </label>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button className="outline-button yellow" onClick={handlePosterguar} style={{ flex: 1 }}>Confirmar</button>
+              <button className="outline-button" onClick={() => setPostergando(null)} style={{ flex: 1 }}>Cancelar</button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   )

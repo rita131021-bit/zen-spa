@@ -64,6 +64,7 @@ const estadisticasRouter = require('./routes/estadisticas');
 const horariosRouter = require('./routes/horarios');
 const recordatoriosRouter = require('./routes/recordatorios');
 const createChatRouter = require('./routes/chat');
+const giftCardsRouter = require('./routes/giftcards');
 const { runRecordatoriosJob } = require('./services/recordatoriosJob');
 
 const server = http.createServer(app);
@@ -87,6 +88,7 @@ app.use('/api/estadisticas', estadisticasRouter(db));
 app.use('/api/horarios', horariosRouter(db));
 app.use('/api/recordatorios', recordatoriosRouter(db));
 app.use('/api/chat', createChatRouter(db, io));
+app.use('/api/giftcards', giftCardsRouter(db));
 
 // Health check
 app.get('/health', (req, res) => {
