@@ -27,10 +27,20 @@ export default function ClientesManager({
   const [clientes, setClientes] = useState<Cliente[]>(initialClientes)
   const [search, setSearch] = useState("")
   const [showForm, setShowForm] = useState(false)
+  const [editando, setEditando] = useState<Cliente | null>(null)
   const [form, setForm] = useState(emptyCliente)
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
+
+  const cargarClientes = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/clientes`)
+      if (res.ok) setClientes(await res.json())
+    } catch (err) {
+      console.error("Error cargando clientes:", err)
+    }
+  }
 
   const enriched = useMemo(() => {
     return clientes.map((cliente) => {
@@ -40,7 +50,7 @@ export default function ClientesManager({
         `${b.fecha}${b.hora}`.localeCompare(`${a.fecha}${a.hora}`)
       )
       const last = sorted[0]
-      const total = clientTurns.reduce((sum, t) => sum + Number((t as Turno & { servicio_precio?: number }).servicio_precio || 0), 0)
+      const total = clientTurns.reduce((sum, t) => sum + Number((t as any).servicio_precio || 0), 0)
       return {
         cliente,
         pets,
@@ -65,29 +75,43 @@ export default function ClientesManager({
     const now = new Date()
     return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear()
   }).length
-
-  async function reload() {
-    const res = await fetch(`${API_BASE}/api/clientes`, { cache: "no-store" })
-    if (res.ok) setClientes(await res.json())
-  }
+  const conWhatsApp = clientes.filter((c) => c.whatsapp).length
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setSaving(true)
     setMessage("")
     setError("")
+    
+    if (!form.nombre.trim()) {
+      setError("El nombre es obligatorio.")
+      setSaving(false)
+      return
+    }
+
+    const method = editando ? "PUT" : "POST"
+    const url = editando ? `${API_BASE}/api/clientes/${editando.id}` : `${API_BASE}/api/clientes`
+
     try {
-      const response = await fetch(`${API_BASE}/api/clientes`, {
-        method: "POST",
+      const response = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          nombre: form.nombre.trim(),
+          telefono: form.telefono || null,
+          whatsapp: form.whatsapp || null,
+          email: form.email || null,
+          direccion: form.direccion || null,
+          notas: form.notas || null,
+        }),
       })
       const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error || "No se pudo crear el cliente")
-      setMessage("Cliente creado correctamente")
+      if (!response.ok) throw new Error(data.error || "No se pudo guardar")
+      setMessage(editando ? "✅ Cliente actualizado" : "✅ Cliente creado correctamente")
       setForm(emptyCliente)
+      setEditando(null)
       setShowForm(false)
-      await reload()
+      await cargarClientes()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al guardar")
     } finally {
@@ -95,78 +119,144 @@ export default function ClientesManager({
     }
   }
 
+  async function handleEliminar(id: number) {
+    if (!confirm("¿Eliminar este cliente?")) return
+    try {
+      const res = await fetch(`${API_BASE}/api/clientes/${id}`, { method: "DELETE" })
+      if (res.ok) {
+        await cargarClientes()
+      }
+    } catch (err) {
+      console.error("Error:", err)
+    }
+  }
+
   return (
     <>
       <PageHeader
-        eyebrow="usr"
-        title="Gestion de Clientes"
-        subtitle="Administra la informacion y el historial de todos tus clientes."
+        eyebrow="👥 Gestión"
+        title="Clientes y Dueños"
+        subtitle="Administra contactos, historial de servicios y preferencias"
         action={
-          <div className="header-actions">
-            <button type="button" className="outline-button" onClick={() => setShowForm((v) => !v)}>
-              + Nuevo cliente
-            </button>
-          </div>
+          <button className="outline-button yellow" onClick={() => {
+            setEditando(null)
+            setForm(emptyCliente)
+            setShowForm(!showForm)
+          }}>
+            {showForm ? "✕ Cancelar" : "+ Nuevo cliente"}
+          </button>
         }
       />
 
       <section className="metrics-grid five">
-        <MetricCard label="Total de clientes" value={String(total)} detail="Sincronizado con backend" tone="green" />
-        <MetricCard label="Clientes nuevos (mes)" value={String(thisMonth)} detail="Segun fecha de alta" tone="green" />
-        <MetricCard label="Con mascotas" value={String(enriched.filter((e) => e.pets.length > 0).length)} detail="Clientes con al menos una mascota" tone="yellow" />
-        <MetricCard label="Con turnos" value={String(enriched.filter((e) => e.last).length)} detail="Historial de reservas" />
-        <MetricCard label="Sin turnos" value={String(enriched.filter((e) => !e.last).length)} detail="Aun sin reservas" tone="red" />
+        <MetricCard label="Total de clientes" value={String(total)} detail="Registrados" tone="purple" />
+        <MetricCard label="Nuevos este mes" value={String(thisMonth)} detail="Últimos 30 días" tone="blue" />
+        <MetricCard label="Con WhatsApp" value={String(conWhatsApp)} detail="Contacto directo" tone="green" />
+        <MetricCard label="Mascotas" value={String(mascotas.length)} detail="En sistema" tone="yellow" />
+        <MetricCard label="Turnos pendientes" value={String(turnos.filter((t) => t.estado === "Pendiente").length)} detail="Sin confirmar" tone="yellow" />
       </section>
 
       {showForm && (
-        <section className="panel-card block-form">
-          <h3>Nuevo cliente</h3>
-          <form className="form-grid" onSubmit={handleSubmit}>
-            <label>
-              Nombre
-              <input required value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
+        <section className="panel-card">
+          <h3 style={{ marginBottom: "24px", fontSize: "18px", fontWeight: "600" }}>
+            👤 {editando ? "Editar" : "Registrar"} Cliente
+          </h3>
+          <form className="form-grid" onSubmit={handleSubmit} style={{ gridTemplateColumns: "repeat(2, 1fr)", gap: "20px" }}>
+            <label style={{ gridColumn: "1 / -1", display: "grid", gap: "8px" }}>
+              <span style={{ fontSize: "13px", fontWeight: "600", color: "#e9d5ff", textTransform: "uppercase" }}>👤 Nombre completo *</span>
+              <input 
+                required
+                value={form.nombre}
+                onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                placeholder="Nombre del dueño"
+                style={{ padding: "11px 12px", minHeight: "42px" }}
+              />
             </label>
-            <label>
-              Telefono
-              <input value={form.telefono} onChange={(e) => setForm({ ...form, telefono: e.target.value })} />
+
+            <label style={{ display: "grid", gap: "8px" }}>
+              <span style={{ fontSize: "13px", fontWeight: "600", color: "#e9d5ff", textTransform: "uppercase" }}>☎️ Teléfono</span>
+              <input 
+                type="tel"
+                value={form.telefono}
+                onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+                placeholder="(03447) 123456"
+                style={{ padding: "11px 12px", minHeight: "42px" }}
+              />
             </label>
-            <label>
-              WhatsApp
-              <input value={form.whatsapp} onChange={(e) => setForm({ ...form, whatsapp: e.target.value })} />
+            <label style={{ display: "grid", gap: "8px" }}>
+              <span style={{ fontSize: "13px", fontWeight: "600", color: "#e9d5ff", textTransform: "uppercase" }}>💬 WhatsApp</span>
+              <input 
+                type="tel"
+                value={form.whatsapp}
+                onChange={(e) => setForm({ ...form, whatsapp: e.target.value })}
+                placeholder="549xx123456"
+                style={{ padding: "11px 12px", minHeight: "42px" }}
+              />
             </label>
-            <label>
-              Email
-              <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+
+            <label style={{ gridColumn: "1 / -1", display: "grid", gap: "8px" }}>
+              <span style={{ fontSize: "13px", fontWeight: "600", color: "#e9d5ff", textTransform: "uppercase" }}>📧 Email</span>
+              <input 
+                type="email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                placeholder="correo@ejemplo.com"
+                style={{ padding: "11px 12px", minHeight: "42px" }}
+              />
             </label>
-            <label>
-              Direccion
-              <input value={form.direccion} onChange={(e) => setForm({ ...form, direccion: e.target.value })} />
+
+            <label style={{ gridColumn: "1 / -1", display: "grid", gap: "8px" }}>
+              <span style={{ fontSize: "13px", fontWeight: "600", color: "#e9d5ff", textTransform: "uppercase" }}>📍 Dirección</span>
+              <input 
+                value={form.direccion}
+                onChange={(e) => setForm({ ...form, direccion: e.target.value })}
+                placeholder="Calle, número, localidad"
+                style={{ padding: "11px 12px", minHeight: "42px" }}
+              />
             </label>
-            <label>
-              Notas
-              <textarea value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} />
+
+            <label style={{ gridColumn: "1 / -1", display: "grid", gap: "8px" }}>
+              <span style={{ fontSize: "13px", fontWeight: "600", color: "#e9d5ff", textTransform: "uppercase" }}>📝 Notas / Observaciones</span>
+              <textarea 
+                value={form.notas}
+                onChange={(e) => setForm({ ...form, notas: e.target.value })}
+                placeholder="Preferencias, referencias, datos de interés..."
+                style={{ padding: "12px", minHeight: "80px", fontSize: "14px", lineHeight: "1.5" }}
+              />
             </label>
-            <div className="button-row">
-              <button className="outline-button yellow" type="submit" disabled={saving}>
-                {saving ? "Guardando..." : "Guardar cliente"}
+
+            <div style={{ gridColumn: "1 / -1", display: "flex", gap: "12px", marginTop: "8px" }}>
+              <button className="outline-button yellow" type="submit" disabled={saving} style={{ flex: 1 }}>
+                {saving ? "⏳ Guardando..." : editando ? "✏️ Actualizar" : "✅ Crear cliente"}
               </button>
-              <button className="outline-button" type="button" onClick={() => setShowForm(false)}>
+              <button className="outline-button" type="button" onClick={() => setShowForm(false)} style={{ flex: 1 }}>
                 Cancelar
               </button>
             </div>
           </form>
-          {message && <p className="tone-green">{message}</p>}
-          {error && <p className="tone-red">{error}</p>}
+
+          {message && (
+            <div style={{ marginTop: "16px", padding: "12px", borderRadius: "7px", background: "rgba(34, 197, 94, 0.2)", color: "#86efac", fontSize: "13px" }}>
+              {message}
+            </div>
+          )}
+          {error && (
+            <div style={{ marginTop: "16px", padding: "12px", borderRadius: "7px", background: "rgba(239, 68, 68, 0.2)", color: "#fca5a5", fontSize: "13px" }}>
+              {error}
+            </div>
+          )}
         </section>
       )}
 
       <section className="panel-card table-card">
-        <div className="card-head">
+        <div style={{ marginBottom: "16px", display: "flex", gap: "12px", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ margin: 0 }}>Clientes Registrados</h3>
           <input
-            className="small-search"
-            placeholder="Buscar cliente por nombre, telefono o email..."
+            type="text"
+            placeholder="Buscar cliente..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            style={{ padding: "8px 12px", minHeight: "36px", fontSize: "13px", width: "250px" }}
           />
         </div>
         <table>
@@ -174,62 +264,48 @@ export default function ClientesManager({
             <tr>
               <th>Cliente</th>
               <th>Contacto</th>
+              <th>WhatsApp</th>
               <th>Mascotas</th>
-              <th>Ultimo turno</th>
-              <th>Total gastado</th>
-              <th>Estado</th>
+              <th>Turnos</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6}>No hay clientes para mostrar.</td>
+                <td colSpan={6} style={{ textAlign: "center", padding: "24px", color: "var(--muted)" }}>
+                  {total === 0 ? "📭 No hay clientes" : "🔍 No hay resultados"}
+                </td>
               </tr>
             )}
-            {filtered.map(({ cliente, pets, last, total }) => (
+            {filtered.map(({ cliente, pets, total: clientTotal }) => (
               <tr key={cliente.id}>
-                <td>
-                  <div className="people-cell">
-                    <span className="mini-avatar">{cliente.nombre?.[0] || "?"}</span>
-                    {cliente.nombre}
-                  </div>
+                <td style={{ fontWeight: "500" }}>{cliente.nombre}</td>
+                <td style={{ fontSize: "12px" }}>
+                  {cliente.telefono && <div>☎️ {cliente.telefono}</div>}
+                  {cliente.email && <div style={{ color: "var(--muted)" }}>{cliente.email}</div>}
                 </td>
-                <td>{cliente.whatsapp || cliente.telefono || cliente.email || "-"}</td>
-                <td>{pets.map((p) => p.nombre).join(", ") || "-"}</td>
                 <td>
-                  {last
-                    ? `${String(last.fecha).slice(0, 10)} ${String(last.hora).slice(0, 5)}`
-                    : "-"}
+                  {cliente.whatsapp ? (
+                    <a href={`https://wa.me/${cliente.whatsapp}`} target="_blank" rel="noopener noreferrer" style={{ color: "#22c55e", fontSize: "12px", textDecoration: "none" }}>
+                      💬 {cliente.whatsapp}
+                    </a>
+                  ) : (
+                    <span style={{ color: "var(--muted)", fontSize: "12px" }}>-</span>
+                  )}
                 </td>
-                <td>${total.toLocaleString("es-AR")}</td>
-                <td>
-                  <span className={last ? "pill green" : "pill yellow"}>
-                    {last ? "Activo" : "Sin turnos"}
-                  </span>
+                <td style={{ fontSize: "13px", fontWeight: "600" }}>{pets.length} 🐾</td>
+                <td style={{ fontSize: "13px", fontWeight: "600" }}>
+                  {turnos.filter((t) => Number(t.cliente_id) === cliente.id).length}
+                </td>
+                <td style={{ display: "flex", gap: "8px" }}>
+                  <button onClick={() => { setEditando(cliente); setForm(cliente as typeof emptyCliente); setShowForm(true); }} style={{ padding: "4px 8px", fontSize: "12px", background: "rgba(126, 34, 206, 0.3)", border: "1px solid rgba(126, 34, 206, 0.5)", borderRadius: "4px", cursor: "pointer", color: "#e9d5ff" }}>✏️</button>
+                  <button onClick={() => handleEliminar(cliente.id!)} style={{ padding: "4px 8px", fontSize: "12px", background: "rgba(239, 68, 68, 0.3)", border: "1px solid rgba(239, 68, 68, 0.5)", borderRadius: "4px", cursor: "pointer", color: "#fca5a5" }}>🗑️</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-      </section>
-
-      <section className="three-grid">
-        <article className="panel-card donut-card">
-          <h3>Segmentacion de clientes</h3>
-          <div className="donut">
-            <strong>{total}</strong>
-            <span>Total</span>
-          </div>
-        </article>
-        <article className="panel-card">
-          <h3>Clientes nuevos</h3>
-          <p>{thisMonth} alta(s) este mes</p>
-        </article>
-        <article className="panel-card">
-          <h3>Resumen rapido</h3>
-          <p>{enriched.filter((e) => e.pets.length > 0).length} con mascotas registradas</p>
-          <p>{enriched.filter((e) => e.last).length} con historial de turnos</p>
-        </article>
       </section>
     </>
   )

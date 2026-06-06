@@ -14,10 +14,17 @@ const emptyMascota = {
   cliente_id: "",
   nombre: "",
   especie: "",
+  tipo_mascota: "",
   raza: "",
+  tamaño: "",
   peso: "",
   edad: "",
   sexo: "",
+  alimento_tipo: "",
+  alimento_especial: false,
+  horario_preferido: "",
+  camita: false,
+  mantita: false,
   notas: "",
 }
 
@@ -33,12 +40,22 @@ export default function MascotasManager({
   const [mascotas, setMascotas] = useState<Mascota[]>(initialMascotas)
   const [search, setSearch] = useState("")
   const [showForm, setShowForm] = useState(false)
+  const [editando, setEditando] = useState<Mascota | null>(null)
   const [form, setForm] = useState(emptyMascota)
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
 
   const today = normalizeDate(new Date().toISOString())
+
+  const cargarMascotas = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/mascotas`)
+      if (res.ok) setMascotas(await res.json())
+    } catch (err) {
+      console.error("Error cargando mascotas:", err)
+    }
+  }
 
   const enriched = useMemo(() => {
     return mascotas.map((mascota) => {
@@ -64,44 +81,58 @@ export default function MascotasManager({
 
   const perros = mascotas.filter((m) => String(m.especie || "").toLowerCase().includes("perr")).length
   const gatos = mascotas.filter((m) => String(m.especie || "").toLowerCase().includes("gat")).length
+  const conAlimentoEspecial = mascotas.filter((m) => m.alimento_especial).length
   const activas = enriched.filter((e) => e.next || e.last).length
-
-  async function reload() {
-    const res = await fetch(`${API_BASE}/api/mascotas`, { cache: "no-store" })
-    if (res.ok) setMascotas(await res.json())
-  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setSaving(true)
     setMessage("")
     setError("")
+    
     if (!form.cliente_id) {
       setError("Seleccioná un dueño.")
       setSaving(false)
       return
     }
+    if (!form.nombre.trim()) {
+      setError("El nombre de la mascota es obligatorio.")
+      setSaving(false)
+      return
+    }
+
+    const method = editando ? "PUT" : "POST"
+    const url = editando ? `${API_BASE}/api/mascotas/${editando.id}` : `${API_BASE}/api/mascotas`
+
     try {
-      const response = await fetch(`${API_BASE}/api/mascotas`, {
-        method: "POST",
+      const response = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           cliente_id: Number(form.cliente_id),
-          nombre: form.nombre,
+          nombre: form.nombre.trim(),
           especie: form.especie || null,
+          tipo_mascota: form.tipo_mascota || null,
           raza: form.raza || null,
+          tamaño: form.tamaño || null,
           peso: form.peso ? Number(form.peso) : null,
           edad: form.edad || null,
           sexo: form.sexo || null,
+          alimento_tipo: form.alimento_tipo || null,
+          alimento_especial: Boolean(form.alimento_especial),
+          horario_preferido: form.horario_preferido || null,
+          camita: Boolean(form.camita),
+          mantita: Boolean(form.mantita),
           notas: form.notas || null,
         }),
       })
       const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error || "No se pudo crear la mascota")
-      setMessage("Mascota creada correctamente")
+      if (!response.ok) throw new Error(data.error || "No se pudo guardar la mascota")
+      setMessage(editando ? "✅ Mascota actualizada" : "✅ Mascota creada correctamente")
       setForm(emptyMascota)
+      setEditando(null)
       setShowForm(false)
-      await reload()
+      await cargarMascotas()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al guardar")
     } finally {
@@ -109,178 +140,227 @@ export default function MascotasManager({
     }
   }
 
+  async function handleEliminar(id: number) {
+    if (!confirm("¿Eliminar esta mascota?")) return
+    try {
+      const res = await fetch(`${API_BASE}/api/mascotas/${id}`, { method: "DELETE" })
+      if (res.ok) {
+        await cargarMascotas()
+      }
+    } catch (err) {
+      console.error("Error:", err)
+    }
+  }
+
   return (
     <>
       <PageHeader
-        eyebrow="pet"
-        title="Gestion de Mascotas"
-        subtitle="Administra la informacion y el historial de todas las mascotas registradas."
+        eyebrow="🐾 Gestión"
+        title="Mascotas Registradas"
+        subtitle="Administra la información completa, preferencias y historial de todas las mascotas."
         action={
-          <div className="header-actions">
-            <button type="button" className="outline-button" onClick={() => setShowForm((v) => !v)}>
-              + Nueva mascota
-            </button>
-          </div>
+          <button className="outline-button yellow" onClick={() => {
+            setEditando(null)
+            setForm(emptyMascota)
+            setShowForm(!showForm)
+          }}>
+            {showForm ? "✕ Cancelar" : "+ Nueva mascota"}
+          </button>
         }
       />
 
       <section className="metrics-grid five">
-        <MetricCard label="Total de mascotas" value={String(mascotas.length)} detail="Sincronizado con backend" tone="green" />
-        <MetricCard label="Perros" value={String(perros)} detail="Segun especie registrada" tone="blue" />
-        <MetricCard label="Gatos" value={String(gatos)} detail="Segun especie registrada" tone="yellow" />
-        <MetricCard label="Activas" value={String(activas)} detail="Con turnos recientes o proximos" tone="green" />
-        <MetricCard label="Sin turnos" value={String(mascotas.length - activas)} detail="Sin actividad registrada" />
+        <MetricCard label="Total de mascotas" value={String(mascotas.length)} detail="Registradas" tone="purple" />
+        <MetricCard label="Perros" value={String(perros)} detail="En el sistema" tone="blue" />
+        <MetricCard label="Gatos" value={String(gatos)} detail="En el sistema" tone="green" />
+        <MetricCard label="Alimento especial" value={String(conAlimentoEspecial)} detail="Con requisitos" tone="yellow" />
+        <MetricCard label="Activas" value={String(activas)} detail="Con turnos" tone="green" />
       </section>
 
       {showForm && (
-        <section className="panel-card block-form">
-          <h3>Nueva mascota</h3>
-          <form className="form-grid" onSubmit={handleSubmit}>
-            <label>
-              Dueño
-              <select
-                required
-                value={form.cliente_id}
-                onChange={(e) => setForm({ ...form, cliente_id: e.target.value })}
-              >
-                <option value="">Seleccionar cliente</option>
-                {clientes.map((cliente) => (
-                  <option key={cliente.id} value={cliente.id}>
-                    {cliente.nombre}
-                  </option>
-                ))}
-              </select>
+        <section className="panel-card">
+          <h3 style={{ marginBottom: "24px", fontSize: "18px", fontWeight: "600" }}>
+            🐱 {editando ? "Editar" : "Registrar"} Mascota
+          </h3>
+          <form className="form-grid" onSubmit={handleSubmit} style={{ gridTemplateColumns: "repeat(2, 1fr)", gap: "20px" }}>
+            <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+              <label style={{ display: "grid", gap: "8px" }}>
+                <span style={{ fontSize: "13px", fontWeight: "600", color: "#e9d5ff", textTransform: "uppercase" }}>👤 Dueño *</span>
+                <select required value={form.cliente_id} onChange={(e) => setForm({ ...form, cliente_id: e.target.value })} style={{ padding: "11px 12px", minHeight: "42px" }}>
+                  <option value="">Seleccionar cliente</option>
+                  {clientes.map((cliente) => (
+                    <option key={cliente.id} value={cliente.id}>
+                      {cliente.nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label style={{ display: "grid", gap: "8px" }}>
+                <span style={{ fontSize: "13px", fontWeight: "600", color: "#e9d5ff", textTransform: "uppercase" }}>🏷️ Nombre *</span>
+                <input required value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Luna, Max, Belu..." style={{ padding: "11px 12px", minHeight: "42px" }} />
+              </label>
+            </div>
+
+            <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+              <label style={{ display: "grid", gap: "8px" }}>
+                <span style={{ fontSize: "13px", fontWeight: "600", color: "#e9d5ff", textTransform: "uppercase" }}>🦴 Especie</span>
+                <select value={form.especie} onChange={(e) => setForm({ ...form, especie: e.target.value })} style={{ padding: "11px 12px", minHeight: "42px" }}>
+                  <option value="">Seleccionar</option>
+                  <option value="Perro">Perro</option>
+                  <option value="Gato">Gato</option>
+                  <option value="Conejo">Conejo</option>
+                  <option value="Loro">Loro</option>
+                  <option value="Otro">Otro</option>
+                </select>
+              </label>
+              <label style={{ display: "grid", gap: "8px" }}>
+                <span style={{ fontSize: "13px", fontWeight: "600", color: "#e9d5ff", textTransform: "uppercase" }}>🏷️ Tipo</span>
+                <input value={form.tipo_mascota} onChange={(e) => setForm({ ...form, tipo_mascota: e.target.value })} placeholder="Poodle, Siamés..." style={{ padding: "11px 12px", minHeight: "42px" }} />
+              </label>
+            </div>
+
+            <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+              <label style={{ display: "grid", gap: "8px" }}>
+                <span style={{ fontSize: "13px", fontWeight: "600", color: "#e9d5ff", textTransform: "uppercase" }}>🎯 Raza</span>
+                <input value={form.raza} onChange={(e) => setForm({ ...form, raza: e.target.value })} placeholder="Labrador, Persa..." style={{ padding: "11px 12px", minHeight: "42px" }} />
+              </label>
+              <label style={{ display: "grid", gap: "8px" }}>
+                <span style={{ fontSize: "13px", fontWeight: "600", color: "#e9d5ff", textTransform: "uppercase" }}>📏 Tamaño</span>
+                <select value={form.tamaño} onChange={(e) => setForm({ ...form, tamaño: e.target.value })} style={{ padding: "11px 12px", minHeight: "42px" }}>
+                  <option value="">Seleccionar</option>
+                  <option value="Pequeño">Pequeño (0-5kg)</option>
+                  <option value="Mediano">Mediano (5-20kg)</option>
+                  <option value="Grande">Grande (20-40kg)</option>
+                  <option value="Extra">Extra Grande (+40kg)</option>
+                </select>
+              </label>
+            </div>
+
+            <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+              <label style={{ display: "grid", gap: "8px" }}>
+                <span style={{ fontSize: "13px", fontWeight: "600", color: "#e9d5ff", textTransform: "uppercase" }}>⚖️ Peso (kg)</span>
+                <input type="number" step="0.1" value={form.peso} onChange={(e) => setForm({ ...form, peso: e.target.value })} placeholder="25.5" style={{ padding: "11px 12px", minHeight: "42px" }} />
+              </label>
+              <label style={{ display: "grid", gap: "8px" }}>
+                <span style={{ fontSize: "13px", fontWeight: "600", color: "#e9d5ff", textTransform: "uppercase" }}>🎂 Edad</span>
+                <input value={form.edad} onChange={(e) => setForm({ ...form, edad: e.target.value })} placeholder="3 años, 2 meses" style={{ padding: "11px 12px", minHeight: "42px" }} />
+              </label>
+            </div>
+
+            <div style={{ gridColumn: "1 / -1", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+              <label style={{ display: "grid", gap: "8px" }}>
+                <span style={{ fontSize: "13px", fontWeight: "600", color: "#e9d5ff", textTransform: "uppercase" }}>♀️ Sexo</span>
+                <select value={form.sexo} onChange={(e) => setForm({ ...form, sexo: e.target.value })} style={{ padding: "11px 12px", minHeight: "42px" }}>
+                  <option value="">-</option>
+                  <option value="Hembra">Hembra</option>
+                  <option value="Macho">Macho</option>
+                </select>
+              </label>
+              <label style={{ display: "grid", gap: "8px" }}>
+                <span style={{ fontSize: "13px", fontWeight: "600", color: "#e9d5ff", textTransform: "uppercase" }}>🥘 Alimento</span>
+                <input value={form.alimento_tipo} onChange={(e) => setForm({ ...form, alimento_tipo: e.target.value })} placeholder="Royal Canin, Pedigree..." style={{ padding: "11px 12px", minHeight: "42px" }} />
+              </label>
+            </div>
+
+            <label style={{ gridColumn: "1 / -1", display: "grid", gap: "8px" }}>
+              <span style={{ fontSize: "13px", fontWeight: "600", color: "#e9d5ff", textTransform: "uppercase" }}>🕐 Horario preferido</span>
+              <input value={form.horario_preferido} onChange={(e) => setForm({ ...form, horario_preferido: e.target.value })} placeholder="Mañana, Tarde, 09:00-11:00" style={{ padding: "11px 12px", minHeight: "42px" }} />
             </label>
-            <label>
-              Nombre
-              <input required value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
+
+            <div style={{ gridColumn: "1 / -1", display: "grid", gap: "12px", padding: "16px", borderRadius: "8px", background: "rgba(126, 34, 206, 0.1)" }}>
+              <p style={{ margin: "0 0 8px", fontSize: "13px", fontWeight: "600", color: "#e9d5ff", textTransform: "uppercase" }}>📦 Requisitos especiales</p>
+              <label style={{ display: "flex", gap: "10px", alignItems: "center", cursor: "pointer" }}>
+                <input type="checkbox" checked={Boolean(form.alimento_especial)} onChange={(e) => setForm({ ...form, alimento_especial: e.target.checked })} style={{ width: "18px", height: "18px", cursor: "pointer" }} />
+                <span style={{ fontSize: "14px" }}>🍴 Alimento especial / Dieta restrictiva</span>
+              </label>
+              <label style={{ display: "flex", gap: "10px", alignItems: "center", cursor: "pointer" }}>
+                <input type="checkbox" checked={Boolean(form.camita)} onChange={(e) => setForm({ ...form, camita: e.target.checked })} style={{ width: "18px", height: "18px", cursor: "pointer" }} />
+                <span style={{ fontSize: "14px" }}>🛏️ Trae cama</span>
+              </label>
+              <label style={{ display: "flex", gap: "10px", alignItems: "center", cursor: "pointer" }}>
+                <input type="checkbox" checked={Boolean(form.mantita)} onChange={(e) => setForm({ ...form, mantita: e.target.checked })} style={{ width: "18px", height: "18px", cursor: "pointer" }} />
+                <span style={{ fontSize: "14px" }}>🧣 Trae mantita</span>
+              </label>
+            </div>
+
+            <label style={{ gridColumn: "1 / -1", display: "grid", gap: "8px" }}>
+              <span style={{ fontSize: "13px", fontWeight: "600", color: "#e9d5ff", textTransform: "uppercase" }}>📝 Notas adicionales</span>
+              <textarea value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} placeholder="Alergias, medicamentos, comportamientos..." style={{ padding: "12px", minHeight: "90px", fontSize: "14px", lineHeight: "1.5" }} />
             </label>
-            <label>
-              Especie
-              <input value={form.especie} onChange={(e) => setForm({ ...form, especie: e.target.value })} placeholder="Perro, Gato..." />
-            </label>
-            <label>
-              Raza
-              <input value={form.raza} onChange={(e) => setForm({ ...form, raza: e.target.value })} />
-            </label>
-            <label>
-              Peso (kg)
-              <input value={form.peso} onChange={(e) => setForm({ ...form, peso: e.target.value })} />
-            </label>
-            <label>
-              Edad
-              <input value={form.edad} onChange={(e) => setForm({ ...form, edad: e.target.value })} />
-            </label>
-            <label>
-              Sexo
-              <select value={form.sexo} onChange={(e) => setForm({ ...form, sexo: e.target.value })}>
-                <option value="">-</option>
-                <option value="Hembra">Hembra</option>
-                <option value="Macho">Macho</option>
-              </select>
-            </label>
-            <label>
-              Notas
-              <textarea value={form.notas} onChange={(e) => setForm({ ...form, notas: e.target.value })} />
-            </label>
-            <div className="button-row">
-              <button className="outline-button yellow" type="submit" disabled={saving}>
-                {saving ? "Guardando..." : "Guardar mascota"}
+
+            <div style={{ gridColumn: "1 / -1", display: "flex", gap: "12px", marginTop: "8px" }}>
+              <button className="outline-button yellow" type="submit" disabled={saving} style={{ flex: 1 }}>
+                {saving ? "⏳ Guardando..." : editando ? "✏️ Actualizar" : "✅ Guardar mascota"}
               </button>
-              <button className="outline-button" type="button" onClick={() => setShowForm(false)}>
+              <button className="outline-button" type="button" onClick={() => setShowForm(false)} style={{ flex: 1 }}>
                 Cancelar
               </button>
             </div>
           </form>
-          {message && <p className="tone-green">{message}</p>}
-          {error && <p className="tone-red">{error}</p>}
+
+          {message && (
+            <div style={{ marginTop: "16px", padding: "12px", borderRadius: "7px", background: "rgba(34, 197, 94, 0.2)", color: "#86efac", fontSize: "13px" }}>
+              {message}
+            </div>
+          )}
+          {error && (
+            <div style={{ marginTop: "16px", padding: "12px", borderRadius: "7px", background: "rgba(239, 68, 68, 0.2)", color: "#fca5a5", fontSize: "13px" }}>
+              {error}
+            </div>
+          )}
         </section>
       )}
 
       <section className="panel-card table-card">
-        <div className="card-head">
+        <div style={{ marginBottom: "16px", display: "flex", gap: "12px", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ margin: 0 }}>Mascotas Registradas</h3>
           <input
-            className="small-search"
-            placeholder="Buscar mascota, dueno o raza..."
+            type="text"
+            placeholder="Buscar mascota..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            style={{ padding: "8px 12px", minHeight: "36px", fontSize: "13px", width: "250px" }}
           />
         </div>
         <table>
           <thead>
             <tr>
               <th>Mascota</th>
-              <th>Raza</th>
-              <th>Dueno</th>
+              <th>Dueño</th>
               <th>Especie</th>
-              <th>Ultimo servicio</th>
-              <th>Proximo turno</th>
-              <th>Estado</th>
+              <th>Raza</th>
+              <th>Peso</th>
+              <th>Alimento</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={7}>No hay mascotas para mostrar.</td>
+                <td colSpan={7} style={{ textAlign: "center", padding: "24px", color: "var(--muted)" }}>
+                  {mascotas.length === 0 ? "📭 No hay mascotas" : "🔍 No hay resultados"}
+                </td>
               </tr>
             )}
-            {filtered.map(({ mascota, last, next }) => (
+            {filtered.map(({ mascota }) => (
               <tr key={mascota.id}>
-                <td>
-                  <div className="people-cell">
-                    <span className="mini-avatar">{mascota.nombre?.[0] || "?"}</span>
-                    {mascota.nombre}
-                  </div>
+                <td style={{ fontWeight: "500" }}>{mascota.nombre}</td>
+                <td style={{ fontSize: "12px" }}>{mascota.dueño_nombre || "-"}</td>
+                <td style={{ fontSize: "12px" }}>{mascota.especie || "-"}</td>
+                <td style={{ fontSize: "12px" }}>{mascota.raza || "-"}</td>
+                <td style={{ fontSize: "12px" }}>{mascota.peso ? `${mascota.peso}kg` : "-"}</td>
+                <td style={{ fontSize: "12px" }}>
+                  {mascota.alimento_tipo}
+                  {mascota.alimento_especial && <span style={{ marginLeft: "6px", color: "#facc15" }}>⚠️</span>}
                 </td>
-                <td>{mascota.raza || "-"}</td>
-                <td>{mascota.dueño_nombre || "-"}</td>
-                <td>{mascota.especie || "-"}</td>
-                <td>
-                  {last
-                    ? `${normalizeDate(String(last.fecha))} — ${last.servicio_nombre || "Servicio"}`
-                    : "-"}
-                </td>
-                <td>
-                  {next
-                    ? `${normalizeDate(String(next.fecha))} ${String(next.hora).slice(0, 5)}`
-                    : "-"}
-                </td>
-                <td>
-                  <span className={next ? "pill green" : last ? "pill yellow" : "pill blue"}>
-                    {next ? "Activa" : last ? "En seguimiento" : "Inactiva"}
-                  </span>
+                <td style={{ display: "flex", gap: "8px" }}>
+                  <button onClick={() => { setEditando(mascota); setForm(mascota as typeof emptyMascota); setShowForm(true); }} style={{ padding: "4px 8px", fontSize: "12px", background: "rgba(126, 34, 206, 0.3)", border: "1px solid rgba(126, 34, 206, 0.5)", borderRadius: "4px", cursor: "pointer", color: "#e9d5ff" }}>✏️</button>
+                  <button onClick={() => handleEliminar(mascota.id!)} style={{ padding: "4px 8px", fontSize: "12px", background: "rgba(239, 68, 68, 0.3)", border: "1px solid rgba(239, 68, 68, 0.5)", borderRadius: "4px", cursor: "pointer", color: "#fca5a5" }}>🗑️</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
-      </section>
-
-      <section className="three-grid">
-        <article className="panel-card">
-          <h3>Resumen por especie</h3>
-          <p>Perros: {perros}</p>
-          <p>Gatos: {gatos}</p>
-        </article>
-        <article className="panel-card donut-card">
-          <h3>Mascotas por especie</h3>
-          <div className="donut">
-            <strong>{mascotas.length}</strong>
-            <span>Total</span>
-          </div>
-        </article>
-        <article className="panel-card">
-          <h3>Actividad reciente</h3>
-          {enriched
-            .filter((e) => e.last)
-            .slice(0, 3)
-            .map(({ mascota, last }) => (
-              <p key={mascota.id}>
-                {mascota.nombre} — {last?.servicio_nombre || "Servicio"} ({normalizeDate(String(last?.fecha))})
-              </p>
-            ))}
-          {enriched.filter((e) => e.last).length === 0 && <p>Sin actividad registrada.</p>}
-        </article>
       </section>
     </>
   )

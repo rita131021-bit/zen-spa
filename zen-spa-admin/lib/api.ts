@@ -63,6 +63,14 @@ export type Mascota = {
   sexo?: string | null
   dueño_nombre?: string | null
   dueño_whatsapp?: string | null
+  // Nuevos campos
+  tipo_mascota?: string | null
+  tamaño?: string | null
+  alimento_tipo?: string | null
+  alimento_especial?: boolean | number | null
+  horario_preferido?: string | null
+  camita?: boolean | number | null
+  mantita?: boolean | number | null
 }
 
 export type Profesional = {
