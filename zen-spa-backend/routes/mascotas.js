@@ -40,17 +40,17 @@ module.exports = (db) => {
   router.post('/', (req, res) => {
     const { 
       cliente_id, nombre, especie, raza, peso, edad, sexo, notas,
-      tipo_mascota, tamaño, alimento_tipo, alimento_especial,
+      tipo_mascota, tamanio, alimento_tipo, alimento_especial,
       horario_preferido, camita, mantita
     } = req.body;
     const sql = `INSERT INTO mascotas 
       (cliente_id, nombre, especie, raza, peso, edad, sexo, notas, 
-       tipo_mascota, tamaño, alimento_tipo, alimento_especial, 
+       tipo_mascota, tamanio, alimento_tipo, alimento_especial, 
        horario_preferido, camita, mantita) 
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
     db.query(sql, [
       cliente_id, nombre, especie, raza, peso, edad, sexo, notas,
-      tipo_mascota || null, tamaño || null, alimento_tipo || null, alimento_especial || false,
+      tipo_mascota || null, tamanio || null, alimento_tipo || null, alimento_especial || false,
       horario_preferido || null, camita || false, mantita || false
     ], (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
@@ -62,17 +62,17 @@ module.exports = (db) => {
   router.put('/:id', (req, res) => {
     const { 
       nombre, especie, raza, peso, edad, sexo, notas,
-      tipo_mascota, tamaño, alimento_tipo, alimento_especial,
+      tipo_mascota, tamanio, alimento_tipo, alimento_especial,
       horario_preferido, camita, mantita
     } = req.body;
     const sql = `UPDATE mascotas SET 
       nombre=?, especie=?, raza=?, peso=?, edad=?, sexo=?, notas=?,
-      tipo_mascota=?, tamaño=?, alimento_tipo=?, alimento_especial=?,
+      tipo_mascota=?, tamanio=?, alimento_tipo=?, alimento_especial=?,
       horario_preferido=?, camita=?, mantita=?
       WHERE id=?`;
     db.query(sql, [
       nombre, especie, raza, peso, edad, sexo, notas,
-      tipo_mascota || null, tamaño || null, alimento_tipo || null, alimento_especial || false,
+      tipo_mascota || null, tamanio || null, alimento_tipo || null, alimento_especial || false,
       horario_preferido || null, camita || false, mantita || false,
       req.params.id
     ], (err) => {
