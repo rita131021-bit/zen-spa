@@ -2,10 +2,34 @@
 -- Limpiar servicios duplicados — dejar los nombres correctos
 -- ============================================================
 
--- Paso 1: eliminar todos los servicios y reinsertarlos limpios
--- (solo si la tabla tiene más de 7 registros, hay duplicados)
-DELETE FROM servicios;
-ALTER TABLE servicios AUTO_INCREMENT = 1;
+-- Paso 1: limpiar duplicados dejando solo un registro por nombre
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- Eliminar duplicados: dejar el de menor id por nombre
+DELETE s1 FROM servicios s1
+INNER JOIN servicios s2
+WHERE s1.id > s2.id AND s1.nombre = s2.nombre;
+
+-- Limpiar nombres con caracteres rotos y normalizar
+UPDATE servicios SET nombre = 'Guardería Felina'             WHERE nombre LIKE '%elina%' AND nombre NOT LIKE 'Guarder_a Felina';
+UPDATE servicios SET nombre = 'Guardería Canina'             WHERE nombre LIKE '%anina%' AND nombre NOT LIKE 'Guarder_a Canina';
+UPDATE servicios SET nombre = 'Peluquería Básica'            WHERE nombre LIKE '%sica%'  AND nombre NOT LIKE 'Peluquer_a%';
+UPDATE servicios SET nombre = 'Spa Relax'                    WHERE nombre LIKE '%Relax%';
+UPDATE servicios SET nombre = 'Spa Premium'                  WHERE nombre LIKE '%Premium%';
+UPDATE servicios SET nombre = 'Terapia Alternativa Holística' WHERE nombre LIKE '%Hol%' OR nombre LIKE '%erapia%';
+UPDATE servicios SET nombre = 'Baño Simple'                  WHERE nombre LIKE '%Simple%' OR nombre LIKE '%a_o%';
+
+-- Insertar los que no existen
+INSERT IGNORE INTO servicios (nombre, descripcion, precio, duracion_minutos, categoria, activo) VALUES
+('Guardería Felina',             'Cuidado especializado para gatos', 1800.00, 480, 'guarderia', 1),
+('Guardería Canina',             'Cuidado diario para perros',       1500.00, 480, 'guarderia', 1),
+('Peluquería Básica',            'Baño, corte y peinado profesional', 2000.00, 120, 'peluqueria', 1),
+('Spa Relax',                    'Spa relajante con masaje',         3000.00,  75, 'spa',        1),
+('Spa Premium',                  'Spa de lujo exclusivo',            4500.00,  90, 'spa',        1),
+('Terapia Alternativa Holística','Terapias energéticas y reiki',     2800.00,  60, 'terapia',    1),
+('Baño Simple',                  'Baño y secado básico',             1200.00,  45, 'peluqueria', 1);
+
+SET FOREIGN_KEY_CHECKS = 1;
 
 INSERT INTO servicios (nombre, descripcion, precio, duracion_minutos, categoria, activo) VALUES
 ('Guardería Felina',            'Cuidado especializado para gatos con ambiente tranquilo y seguro', 1800.00, 480, 'guarderia', 1),
