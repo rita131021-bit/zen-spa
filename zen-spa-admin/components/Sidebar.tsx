@@ -14,11 +14,12 @@ const primaryItems = [
   { href: "/reportes", label: "Reportes", icon: "RP" },
   { href: "/finanzas", label: "Finanzas", icon: "$" },
   { href: "/recordatorios", label: "Recordatorios", icon: "RE" },
+  { href: "/gift-cards", label: "Gift Cards", icon: "GC" },
   { href: "/centro-mensajes", label: "Centro de Mensajes", icon: "CM" },
 ]
 
 const advancedItems = [
-  { href: "/horarios", label: "Bloqueos / Vacaciones", icon: "BL" },
+  { href: "/bloqueos", label: "Bloqueos / Vacaciones", icon: "BL" },
   { href: "/pasarela-pago", label: "Pasarela de Pago", icon: "PG" },
   { href: "/configuracion", label: "Configuracion", icon: "CF" },
 ]

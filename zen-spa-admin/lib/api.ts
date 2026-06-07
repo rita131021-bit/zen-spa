@@ -121,3 +121,17 @@ export type RecordatorioItem = {
   fecha?: string
   hora?: string
 }
+
+export type GiftCard = {
+  id: number
+  codigo: string
+  monto_inicial: number
+  monto_saldo: number
+  cliente_id?: number | null
+  cliente_nombre?: string | null
+  estado: 'activa' | 'canjeada' | 'vencida' | 'anulada'
+  fecha_emision: string
+  fecha_vencimiento?: string | null
+  notas?: string | null
+  creado_en?: string
+}
