@@ -60,7 +60,7 @@ ALTER TABLE turnos ADD COLUMN precio_final DECIMAL(10,2);
 
 -- Columnas nuevas en mascotas
 ALTER TABLE mascotas ADD COLUMN tipo_mascota VARCHAR(50);
-ALTER TABLE mascotas ADD COLUMN tamaño VARCHAR(50);
+ALTER TABLE mascotas ADD COLUMN talla VARCHAR(50);
 ALTER TABLE mascotas ADD COLUMN alimento_tipo VARCHAR(100);
 ALTER TABLE mascotas ADD COLUMN alimento_especial BOOLEAN DEFAULT FALSE;
 ALTER TABLE mascotas ADD COLUMN horario_preferido VARCHAR(100);

@@ -31,7 +31,7 @@ test.describe('Mascotas Manager - Form Validation', () => {
         'Especie', 'especie', 'species',
         'Tipo', 'tipo_mascota',
         'Raza', 'raza', 'breed',
-        'Tamaño', 'tamaño', 'size',
+        'talla', 'talla', 'size',
         'Peso', 'peso', 'weight',
         'Edad', 'edad', 'age',
       ];
