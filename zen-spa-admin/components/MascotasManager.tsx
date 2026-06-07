@@ -225,7 +225,7 @@ export default function MascotasManager({
                 <input value={form.raza} onChange={(e) => setForm({ ...form, raza: e.target.value })} placeholder="Labrador, Persa..." style={{ padding: "11px 12px", minHeight: "42px" }} />
               </label>
               <label style={{ display: "grid", gap: "8px" }}>
-                <span style={{ fontSize: "13px", fontWeight: "600", color: "#e9d5ff", textTransform: "uppercase" }}>📏 Tamaño</span>
+                <span style={{ fontSize: "13px", fontWeight: "600", color: "#e9d5ff", textTransform: "uppercase" }}>📏 Talla</span>
                 <select value={form.talla} onChange={(e) => setForm({ ...form, talla: e.target.value })} style={{ padding: "11px 12px", minHeight: "42px" }}>
                   <option value="">Seleccionar</option>
                   <option value="Pequeño">Pequeño (0-5kg)</option>
