@@ -65,7 +65,7 @@ export type Mascota = {
   dueño_whatsapp?: string | null
   // Nuevos campos
   tipo_mascota?: string | null
-  tamaño?: string | null
+  talla?: string | null
   alimento_tipo?: string | null
   alimento_especial?: boolean | number | null
   horario_preferido?: string | null

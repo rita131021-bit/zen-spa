@@ -16,7 +16,7 @@ const emptyMascota = {
   especie: "",
   tipo_mascota: "",
   raza: "",
-  tamanio: "",
+  talla: "",
   peso: "",
   edad: "",
   sexo: "",
@@ -114,7 +114,7 @@ export default function MascotasManager({
           especie: form.especie || null,
           tipo_mascota: form.tipo_mascota || null,
           raza: form.raza || null,
-          tamanio: form.tamanio || null,
+          talla: form.talla || null,
           peso: form.peso ? Number(form.peso) : null,
           edad: form.edad || null,
           sexo: form.sexo || null,
@@ -226,7 +226,7 @@ export default function MascotasManager({
               </label>
               <label style={{ display: "grid", gap: "8px" }}>
                 <span style={{ fontSize: "13px", fontWeight: "600", color: "#e9d5ff", textTransform: "uppercase" }}>📏 Tamaño</span>
-                <select value={form.tamanio} onChange={(e) => setForm({ ...form, tamanio: e.target.value })} style={{ padding: "11px 12px", minHeight: "42px" }}>
+                <select value={form.talla} onChange={(e) => setForm({ ...form, talla: e.target.value })} style={{ padding: "11px 12px", minHeight: "42px" }}>
                   <option value="">Seleccionar</option>
                   <option value="Pequeño">Pequeño (0-5kg)</option>
                   <option value="Mediano">Mediano (5-20kg)</option>
