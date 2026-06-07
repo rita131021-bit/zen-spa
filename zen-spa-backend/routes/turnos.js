@@ -47,7 +47,7 @@ module.exports = (db) => {
 
   router.post('/', async (req, res) => {
     try {
-      const { cliente_id, mascota_id, servicio_id, profesional_id, canil_id, fecha, hora, observaciones } = req.body;
+      const { cliente_id, mascota_id, servicio_id, profesional_id, canil_id, fecha, hora, fecha_egreso, hora_egreso, observaciones } = req.body;
 
       // Validaciones básicas
       if (!fecha || !hora) {
@@ -157,13 +157,13 @@ module.exports = (db) => {
       // ===== CREAR TURNO =====
       const sql = `
         INSERT INTO turnos
-          (cliente_id, mascota_id, servicio_id, profesional_id, canil_id, fecha, hora, observaciones, estado, pago)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'Pendiente', 'Pendiente')
+          (cliente_id, mascota_id, servicio_id, profesional_id, canil_id, fecha, hora, fecha_egreso, hora_egreso, observaciones, estado, pago)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pendiente', 'Pendiente')
       `;
 
       db.query(
         sql,
-        [cliente_id, mascota_id, servicio_id, profesional_id || null, canil_id || null, fecha, hora, observaciones || null],
+        [cliente_id, mascota_id, servicio_id, profesional_id || null, canil_id || null, fecha, hora, fecha_egreso || null, hora_egreso || null, observaciones || null],
         async (err, result) => {
           if (err) return res.status(500).json({ error: err.message });
 

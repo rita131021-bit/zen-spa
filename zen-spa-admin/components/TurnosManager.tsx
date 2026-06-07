@@ -14,6 +14,8 @@ const emptyForm = {
   profesional_id: "",
   fecha: "",
   hora: "",
+  fecha_egreso: "",
+  hora_egreso: "",
   observaciones: "",
 }
 
@@ -54,6 +56,9 @@ export default function TurnosManager({ initialTurnos = [] }: TurnosManagerProps
   const [busqueda, setBusqueda] = useState("")
 
   const selectedServicio = servicios.find((s) => String(s.id) === form.servicio_id)
+  const esGuarderia = selectedServicio?.categoria === 'guarderia' || 
+    selectedServicio?.nombre?.toLowerCase().includes('guarderia') ||
+    selectedServicio?.nombre?.toLowerCase().includes('guardería')
   const mascotasFiltradas = useMemo(
     () => mascotas.filter((m) => String(m.cliente_id) === form.cliente_id),
     [mascotas, form.cliente_id]
@@ -153,6 +158,8 @@ export default function TurnosManager({ initialTurnos = [] }: TurnosManagerProps
         profesional_id: form.profesional_id ? Number(form.profesional_id) : null,
         fecha: form.fecha,
         hora: form.hora,
+        fecha_egreso: form.fecha_egreso || null,
+        hora_egreso: form.hora_egreso || null,
         observaciones: form.observaciones || null,
       }
       const response = await fetch(`${API_BASE}/api/turnos`, {
@@ -256,11 +263,11 @@ export default function TurnosManager({ initialTurnos = [] }: TurnosManagerProps
             </select>
           </label>
 
-          <label>Fecha
+          <label>{esGuarderia ? "📅 Fecha de ingreso" : "Fecha"}
             <input type="date" required value={form.fecha} onChange={(e) => updateField("fecha", e.target.value)} />
           </label>
 
-          <label>Hora
+          <label>{esGuarderia ? "🕐 Hora de ingreso" : "Hora"}
             {slots.length > 0 ? (
               <select required value={form.hora} onChange={(e) => updateField("hora", e.target.value)}>
                 <option value="">Seleccionar horario</option>
@@ -274,6 +281,17 @@ export default function TurnosManager({ initialTurnos = [] }: TurnosManagerProps
               <input type="time" required value={form.hora} onChange={(e) => updateField("hora", e.target.value)} />
             )}
           </label>
+
+          {esGuarderia && (
+            <>
+              <label>📅 Fecha de egreso
+                <input type="date" required={esGuarderia} value={form.fecha_egreso} onChange={(e) => updateField("fecha_egreso", e.target.value)} min={form.fecha} />
+              </label>
+              <label>🕐 Hora de egreso
+                <input type="time" value={form.hora_egreso} onChange={(e) => updateField("hora_egreso", e.target.value)} />
+              </label>
+            </>
+          )}
 
           {slotHint && <p className={slotHint.startsWith("⛔") ? "tone-red" : "tone-purple"} style={{ gridColumn: "1/-1" }}>{slotHint}</p>}
 

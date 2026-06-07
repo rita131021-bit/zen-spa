@@ -1,0 +1,3 @@
+ALTER TABLE turnos ADD COLUMN fecha_egreso DATE DEFAULT NULL;
+ALTER TABLE turnos ADD COLUMN hora_egreso TIME DEFAULT NULL;
+SELECT 'OK' as resultado;
