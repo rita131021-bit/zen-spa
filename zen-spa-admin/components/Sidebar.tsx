@@ -15,6 +15,7 @@ const primaryItems = [
   { href: "/finanzas", label: "Finanzas", icon: "$" },
   { href: "/recordatorios", label: "Recordatorios", icon: "RE" },
   { href: "/gift-cards", label: "Gift Cards", icon: "GC" },
+  { href: "/descuentos", label: "Descuentos Fidelidad", icon: "DF" },
   { href: "/centro-mensajes", label: "Centro de Mensajes", icon: "CM" },
 ]
 
