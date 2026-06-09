@@ -29,7 +29,7 @@ async function getAvailability(db, { fecha, profesional_id, canil_id }) {
   const dia = dayNames[date.getDay()];
 
   const [bloqueos, feriados, horarios, turnos, caniles] = await Promise.all([
-    query(db, 'SELECT * FROM bloqueos WHERE fecha = ?', [fecha]),
+    query(db, 'SELECT * FROM bloqueos_calendario WHERE fecha = ?', [fecha]),
     query(db, 'SELECT * FROM feriados WHERE fecha = ?', [fecha]),
     query(db, 'SELECT * FROM horarios WHERE dia = ? ORDER BY hora', [dia]),
     query(
@@ -45,7 +45,11 @@ async function getAvailability(db, { fecha, profesional_id, canil_id }) {
   const fechaBloqueada = bloqueos.length > 0;
   const feriado = feriados[0] || null;
   const noLaborable = Boolean(feriado && feriado.no_laborable);
-  const hours = horarios.length > 0 ? horarios.map((item) => item.hora) : fallbackHours;
+  // Deduplicar horas para evitar slots repetidos
+  const horasUnicas = horarios.length > 0
+    ? [...new Set(horarios.map((item) => normalizeTime(item.hora)))].sort()
+    : fallbackHours.map(h => normalizeTime(h));
+  const hours = horasUnicas;
 
   const slots = hours.map((hora) => {
     const horaCorta = normalizeTime(hora);
