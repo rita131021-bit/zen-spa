@@ -197,12 +197,15 @@ export default function ScheduleBlocksPanel() {
           </label>
           <label style={{ display: "grid", gap: "6px" }}>
             <span style={{ fontSize: "12px", fontWeight: "600", color: "#e9d5ff" }}>Motivo</span>
-            <select value={motivo} onChange={(e) => setMotivo(e.target.value)}>
-              <option>Cierre administrativo</option>
-              <option>Mantenimiento</option>
-              <option>Capacitacion</option>
-              <option>Vacaciones</option>
-              <option>Feriado local</option>
+            <select value={motivo} onChange={(e) => setMotivo(e.target.value)}
+              style={{ color: "#fff", background: "var(--card)", border: "1px solid rgba(126,34,206,0.5)", borderRadius: "6px", padding: "10px 12px" }}>
+              <option value="Cierre administrativo" style={{ background: "#1e0b6b", color: "#fff" }}>Cierre administrativo</option>
+              <option value="Mantenimiento"         style={{ background: "#1e0b6b", color: "#fff" }}>Mantenimiento</option>
+              <option value="Capacitacion"          style={{ background: "#1e0b6b", color: "#fff" }}>Capacitacion</option>
+              <option value="Vacaciones"            style={{ background: "#1e0b6b", color: "#fff" }}>Vacaciones</option>
+              <option value="Feriado local"         style={{ background: "#1e0b6b", color: "#fff" }}>Feriado local</option>
+              <option value="Enfermedad"            style={{ background: "#1e0b6b", color: "#fff" }}>Enfermedad</option>
+              <option value="Otro"                  style={{ background: "#1e0b6b", color: "#fff" }}>Otro</option>
             </select>
           </label>
           <button className="outline-button yellow" onClick={() => crearBloqueo("bloqueo")}>
