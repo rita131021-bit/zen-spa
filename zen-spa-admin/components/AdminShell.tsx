@@ -1,5 +1,8 @@
+"use client"
 import Sidebar from "@/components/Sidebar"
 import NewTurnButton from "@/components/NewTurnButton"
+import Link from "next/link"
+import { useState } from "react"
 
 type AdminShellProps = {
   children: React.ReactNode
@@ -20,10 +23,7 @@ export default function AdminShell({ children, aside }: AdminShellProps) {
             <span>BUSCAR</span>
             <input placeholder="Buscar turnos, mascotas, servicios..." />
           </label>
-          <button className="icon-button" aria-label="Notificaciones" title="Notificaciones">
-            <span>!</span>
-            <small>3</small>
-          </button>
+          <NotificacionesButton />
           <div className="user-card">
             <div className="avatar">R</div>
             <div>
@@ -92,20 +92,80 @@ export function MetricCard({
   )
 }
 
-export function PetPanel() {
-  const events = [
-    ["17/04/2026", "Sesion Premium - Bano & Corte", "Pendiente"],
-    ["15/04/2026", "Guarderia Canina", "Completado"],
-    ["15/04/2026", "Peluqueria", "Completado"],
-    ["10/04/2026", "Sesion Relax", "Completado"],
+function NotificacionesButton() {
+  const [open, setOpen] = useState(false)
+  const notifs = [
+    { id: 1, texto: "Turno pendiente de confirmar", link: "/turnos", color: "#facc15" },
+    { id: 2, texto: "Nuevo cliente registrado",     link: "/clientes", color: "#22c55e" },
+    { id: 3, texto: "Recordatorio programado",      link: "/recordatorios", color: "#a78bfa" },
   ]
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        className="icon-button"
+        aria-label="Notificaciones"
+        onClick={() => setOpen(!open)}
+        style={{ cursor: "pointer" }}
+      >
+        <span>🔔</span>
+        <small>{notifs.length}</small>
+      </button>
+      {open && (
+        <div style={{
+          position: "absolute", top: "48px", right: 0, width: "280px",
+          background: "var(--card)", border: "1px solid rgba(126,34,206,0.4)",
+          borderRadius: "10px", boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+          zIndex: 1000, overflow: "hidden",
+        }}>
+          <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(126,34,206,0.2)", fontWeight: "600", fontSize: "13px" }}>
+            🔔 Notificaciones
+          </div>
+          {notifs.map((n) => (
+            <Link key={n.id} href={n.link} onClick={() => setOpen(false)}
+              style={{ display: "flex", gap: "10px", padding: "12px 16px", textDecoration: "none",
+                borderBottom: "1px solid rgba(255,255,255,0.05)", alignItems: "flex-start" }}>
+              <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: n.color, marginTop: "5px", flexShrink: 0 }} />
+              <span style={{ fontSize: "13px", color: "#e9d5ff" }}>{n.texto}</span>
+            </Link>
+          ))}
+          <Link href="/recordatorios" onClick={() => setOpen(false)}
+            style={{ display: "block", padding: "10px 16px", textAlign: "center", fontSize: "12px", color: "var(--muted)", textDecoration: "none" }}>
+            Ver todos →
+          </Link>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function PetPanel() {
+  const [tab, setTab] = useState<"evoluciones" | "historial">("evoluciones")
+
+  const evoluciones = [
+    { fecha: "17/04/2026", nombre: "Sesion Premium - Bano & Corte", estado: "Pendiente",  prof: "A.R." },
+    { fecha: "15/04/2026", nombre: "Guarderia Canina",               estado: "Completado", prof: "A.R." },
+    { fecha: "15/04/2026", nombre: "Peluqueria",                     estado: "Completado", prof: "A.R." },
+    { fecha: "10/04/2026", nombre: "Sesion Relax",                   estado: "Completado", prof: "A.R." },
+  ]
+
+  const historial = [
+    { fecha: "15/04/2026", nombre: "Guarderia Canina",   estado: "Completado", prof: "A.R." },
+    { fecha: "15/04/2026", nombre: "Peluqueria",         estado: "Completado", prof: "A.R." },
+    { fecha: "10/04/2026", nombre: "Sesion Relax",       estado: "Completado", prof: "A.R." },
+  ]
+
+  const items = tab === "evoluciones" ? evoluciones : historial
+
+  const whatsappUrl = "https://wa.me/549XXXXXXXXXX?text=Hola%20Luna%2C%20te%20recordamos%20tu%20turno%20en%20Zen%20Spa"
 
   return (
     <>
       <section className="panel-card pet-card">
         <div className="card-head">
           <h3>Ficha de Mascota</h3>
-          <button className="ghost-button">Editar</button>
+          <Link href="/mascotas" className="ghost-button" style={{ textDecoration: "none", fontSize: "13px", color: "#a78bfa" }}>
+            Editar
+          </Link>
         </div>
         <div className="pet-head">
           <div className="pet-photo">Luna</div>
@@ -121,24 +181,38 @@ export function PetPanel() {
           <p><span>Estado</span><strong className="tone-green">Activa</strong></p>
         </div>
         <div className="tabs">
-          <button className="active">Evoluciones</button>
-          <button>Historial</button>
+          <button
+            className={tab === "evoluciones" ? "active" : ""}
+            onClick={() => setTab("evoluciones")}
+            style={{ cursor: "pointer" }}
+          >
+            Evoluciones
+          </button>
+          <button
+            className={tab === "historial" ? "active" : ""}
+            onClick={() => setTab("historial")}
+            style={{ cursor: "pointer" }}
+          >
+            Historial
+          </button>
         </div>
         <div className="timeline">
-          {events.map(([date, name, status]) => (
-            <div className="timeline-row" key={date + name}>
-              <time>{date}</time>
+          {items.map(({ fecha, nombre, estado, prof }) => (
+            <div className="timeline-row" key={fecha + nombre}>
+              <time>{fecha}</time>
               <div>
-                <strong>{name}</strong>
-                <span className={status === "Pendiente" ? "pill yellow" : "pill green"}>
-                  {status}
+                <strong>{nombre}</strong>
+                <span className={estado === "Pendiente" ? "pill yellow" : "pill green"}>
+                  {estado}
                 </span>
-                <p>Profesional: A.R.</p>
+                <p>Profesional: {prof}</p>
               </div>
             </div>
           ))}
         </div>
-        <button className="wide-button">Ver historial completo</button>
+        <Link href="/turnos" className="wide-button" style={{ display: "block", textAlign: "center", textDecoration: "none", padding: "10px", marginTop: "8px", borderRadius: "7px", background: "rgba(126,34,206,0.3)", color: "#e9d5ff", fontSize: "13px" }}>
+          Ver historial completo
+        </Link>
       </section>
 
       <section className="panel-card quick-summary">
@@ -150,12 +224,28 @@ export function PetPanel() {
           <span><strong>10</strong>Cancelados</span>
         </div>
       </section>
+
       <section className="panel-card quick-summary">
         <h3>Acciones rapidas</h3>
         <div className="quick-actions">
-          <button>Enviar recordatorio</button>
-          <button>Confirmar turno</button>
-          <button>Ver historial</button>
+          <a href={whatsappUrl} target="_blank" rel="noopener noreferrer"
+            style={{ display: "block", padding: "10px", textAlign: "center", textDecoration: "none",
+              background: "rgba(34,197,94,0.2)", border: "1px solid rgba(34,197,94,0.4)",
+              borderRadius: "7px", color: "#86efac", fontSize: "13px", marginBottom: "8px" }}>
+            💬 Enviar recordatorio
+          </a>
+          <Link href="/turnos"
+            style={{ display: "block", padding: "10px", textAlign: "center", textDecoration: "none",
+              background: "rgba(126,34,206,0.2)", border: "1px solid rgba(126,34,206,0.4)",
+              borderRadius: "7px", color: "#e9d5ff", fontSize: "13px", marginBottom: "8px" }}>
+            ✅ Ver y confirmar turnos
+          </Link>
+          <Link href="/turnos"
+            style={{ display: "block", padding: "10px", textAlign: "center", textDecoration: "none",
+              background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: "7px", color: "var(--muted)", fontSize: "13px" }}>
+            📋 Ver historial
+          </Link>
         </div>
       </section>
     </>
