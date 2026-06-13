@@ -241,14 +241,21 @@ button:disabled { cursor: not-allowed; opacity: .52; transform: none; }
 }
 .title-cluster { display: flex; gap: 14px; align-items: center; }
 .spark {
-  display: grid;
-  width: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 46px;
   height: 46px;
-  place-items: center;
+  padding: 0 12px;
   border-radius: 8px;
   color: #d16bff;
   font-weight: 800;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
   background: rgba(126, 34, 206, 0.16);
+  flex-shrink: 0;
 }
 .page-header h2 { font-size: 25px; }
 .header-actions, .button-row, .filter-row, .tab-strip { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
