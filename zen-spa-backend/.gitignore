@@ -1,0 +1,4 @@
+
+# Fotos subidas de reseñas (no versionar)
+uploads/resenas/*
+!uploads/resenas/.gitkeep

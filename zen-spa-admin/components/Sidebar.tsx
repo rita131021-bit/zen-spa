@@ -11,6 +11,7 @@ const primaryItems = [
   { href: "/mascotas", label: "Mascotas", icon: "MA" },
   { href: "/servicios", label: "Servicios", icon: "SV" },
   { href: "/clientes", label: "Clientes", icon: "CL" },
+  { href: "/resenas", label: "Reseñas", icon: "ES" },
   { href: "/reportes", label: "Reportes", icon: "RP" },
   { href: "/finanzas", label: "Finanzas", icon: "$" },
   { href: "/recordatorios", label: "Recordatorios", icon: "RE" },
