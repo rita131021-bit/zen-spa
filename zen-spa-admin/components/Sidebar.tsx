@@ -32,7 +32,18 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-logo">ZEN</div>
+        <img
+          src="/logo-zen.png"
+          alt="Zen Spa para Mascotas"
+          style={{
+            width: "54px",
+            height: "54px",
+            borderRadius: "50%",
+            objectFit: "cover",
+            objectPosition: "center",
+            flexShrink: 0,
+          }}
+        />
         <div>
           <h1>Zen Spa para Mascotas</h1>
           <p>Parana, Entre Rios</p>
