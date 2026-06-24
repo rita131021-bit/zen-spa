@@ -354,7 +354,24 @@ export default function MascotasManager({
                   {mascota.alimento_especial && <span style={{ marginLeft: "6px", color: "#facc15" }}>⚠️</span>}
                 </td>
                 <td style={{ display: "flex", gap: "8px" }}>
-                  <button onClick={() => { setEditando(mascota); setForm(mascota as typeof emptyMascota); setShowForm(true); }} style={{ padding: "4px 8px", fontSize: "12px", background: "rgba(126, 34, 206, 0.3)", border: "1px solid rgba(126, 34, 206, 0.5)", borderRadius: "4px", cursor: "pointer", color: "#e9d5ff" }}>✏️</button>
+                  <button onClick={() => { setEditando(mascota); setForm({
+                    ...emptyMascota,
+                    cliente_id: String(mascota.cliente_id ?? ""),
+                    nombre: mascota.nombre ?? "",
+                    especie: mascota.especie ?? "",
+                    tipo_mascota: mascota.tipo_mascota ?? "",
+                    raza: mascota.raza ?? "",
+                    talla: mascota.talla ?? "",
+                    peso: String(mascota.peso ?? ""),
+                    edad: mascota.edad ?? "",
+                    sexo: mascota.sexo ?? "",
+                    alimento_tipo: mascota.alimento_tipo ?? "",
+                    alimento_especial: mascota.alimento_especial === true || Number(mascota.alimento_especial) === 1,
+                    horario_preferido: mascota.horario_preferido ?? "",
+                    camita: mascota.camita === true || Number(mascota.camita) === 1,
+                    mantita: mascota.mantita === true || Number(mascota.mantita) === 1,
+                    notas: mascota.notas ?? "",
+                  }); setShowForm(true); }} style={{ padding: "4px 8px", fontSize: "12px", background: "rgba(126, 34, 206, 0.3)", border: "1px solid rgba(126, 34, 206, 0.5)", borderRadius: "4px", cursor: "pointer", color: "#e9d5ff" }}>✏️</button>
                   <button onClick={() => handleEliminar(mascota.id!)} style={{ padding: "4px 8px", fontSize: "12px", background: "rgba(239, 68, 68, 0.3)", border: "1px solid rgba(239, 68, 68, 0.5)", borderRadius: "4px", cursor: "pointer", color: "#fca5a5" }}>🗑️</button>
                 </td>
               </tr>

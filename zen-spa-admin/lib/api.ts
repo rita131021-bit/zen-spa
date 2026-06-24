@@ -33,9 +33,11 @@ export type Turno = {
   servicio_id?: number
   profesional_id?: number
   servicio_precio?: number | string
+  precio_final?: number | string
   observaciones?: string | null
   cliente_nombre?: string
   mascota_nombre?: string
+  mascota_especie?: string
   servicio_nombre?: string
   profesional_nombre?: string
   canil_nombre?: string
@@ -71,11 +73,14 @@ export type Mascota = {
   horario_preferido?: string | null
   camita?: boolean | number | null
   mantita?: boolean | number | null
+  notas?: string | null
 }
 
 export type Profesional = {
   id: number
   nombre: string
+  telefono?: string | null
+  email?: string | null
   activo?: number | boolean
 }
 

@@ -1,4 +1,5 @@
 import AdminShell, { PageHeader } from "@/components/AdminShell"
+import DashboardAside from "@/components/DashboardAside"
 import DashboardOverviewLive from "@/components/DashboardOverviewLive"
 import { fetchApi, Turno } from "@/lib/api"
 
@@ -25,16 +26,23 @@ export default async function Home() {
     fetchApi<ServiciosResumen>("/api/estadisticas/servicios-resumen", {}),
   ])
 
-  const today = new Date().toISOString().slice(0, 10)
-  const weekAhead = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
+  const todayDate = new Date()
+  const weekAheadDate = new Date(todayDate)
+  weekAheadDate.setDate(todayDate.getDate() + 7)
+
+  const dateFormatter = new Intl.DateTimeFormat("es-AR", {
+    day: "2-digit",
+    month: "short",
+  })
+  const dateRange = `${dateFormatter.format(todayDate)} al ${dateFormatter.format(weekAheadDate)}`
 
   return (
-    <AdminShell>
+    <AdminShell aside={<DashboardAside resumen={resumen} proximos={proximos} />}>
       <PageHeader
         eyebrow="spark"
         title="Dashboard de Administracion"
         subtitle="Resumen general del negocio en tiempo real."
-        action={<button className="date-button">{today} - {weekAhead}</button>}
+        action={<span className="date-button">{dateRange}</span>}
       />
       <DashboardOverviewLive
         resumen={resumen}

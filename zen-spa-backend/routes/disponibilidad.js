@@ -39,7 +39,7 @@ async function getAvailability(db, { fecha, profesional_id, canil_id }) {
        WHERE fecha = ? AND estado <> 'Cancelado'`,
       [fecha]
     ),
-    query(db, 'SELECT * FROM caniles WHERE activo = 1 ORDER BY nombre'),
+    query(db, 'SELECT * FROM caniles WHERE activo = TRUE ORDER BY nombre'),
   ]);
 
   const fechaBloqueada = bloqueos.length > 0;

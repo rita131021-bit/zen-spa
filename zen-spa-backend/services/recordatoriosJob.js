@@ -19,7 +19,7 @@ async function runRecordatoriosJob(db) {
     LEFT JOIN clientes c ON t.cliente_id = c.id
     LEFT JOIN mascotas m ON t.mascota_id = m.id
     LEFT JOIN servicios s ON t.servicio_id = s.id
-    WHERE t.fecha = DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+    WHERE t.fecha = CURRENT_DATE + INTERVAL '1 day'
       AND t.estado IN ('Pendiente', 'Confirmado')
       AND NOT EXISTS (
         SELECT 1 FROM recordatorios r

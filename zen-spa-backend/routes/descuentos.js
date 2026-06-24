@@ -30,7 +30,8 @@ module.exports = function createDescuentosRouter(db) {
         c.id,
         c.nombre,
         COUNT(t.id) as cantidad_turnos,
-        TIMESTAMPDIFF(MONTH, MIN(t.fecha), CURDATE()) as meses_cliente
+        (EXTRACT(YEAR FROM AGE(CURRENT_DATE, MIN(t.fecha))) * 12
+          + EXTRACT(MONTH FROM AGE(CURRENT_DATE, MIN(t.fecha))))::int as meses_cliente
       FROM clientes c
       LEFT JOIN turnos t ON c.id = t.cliente_id AND t.estado IN ('Confirmado', 'Completado')
       WHERE c.id = ?

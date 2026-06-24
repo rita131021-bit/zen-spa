@@ -70,7 +70,7 @@ module.exports = (db) => {
       LEFT JOIN mascotas     m ON t.mascota_id     = m.id
       LEFT JOIN servicios    s ON t.servicio_id    = s.id
       LEFT JOIN profesionales p ON t.profesional_id = p.id
-      WHERE t.fecha >= CURDATE()
+      WHERE t.fecha >= CURRENT_DATE
         AND t.estado NOT IN ('Cancelado')
       ORDER BY t.fecha ASC, t.hora ASC
       LIMIT 10
@@ -103,7 +103,7 @@ module.exports = (db) => {
         COUNT(*)                   as activos,
         COUNT(DISTINCT categoria)  as categorias
       FROM servicios
-      WHERE activo = 1
+      WHERE activo = TRUE
     `;
     db.query(sql, (err, results) => {
       if (err) return res.status(500).json({ error: err.message });
@@ -126,7 +126,7 @@ module.exports = (db) => {
       LEFT JOIN (
         SELECT mascota_id, fecha, hora
         FROM turnos
-        WHERE fecha >= CURDATE() AND estado != 'Cancelado'
+        WHERE fecha >= CURRENT_DATE AND estado != 'Cancelado'
         ORDER BY fecha ASC, hora ASC
         LIMIT 1
       ) p_next ON m.id = p_next.mascota_id
@@ -134,7 +134,7 @@ module.exports = (db) => {
         SELECT mascota_id, COALESCE(s.nombre,'Sin servicio') as servicio_nombre
         FROM turnos t
         LEFT JOIN servicios s ON t.servicio_id = s.id
-        WHERE t.fecha < CURDATE()
+        WHERE t.fecha < CURRENT_DATE
         ORDER BY t.fecha DESC
         LIMIT 1
       ) p_last ON m.id = p_last.mascota_id

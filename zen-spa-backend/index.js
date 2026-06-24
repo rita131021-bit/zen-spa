@@ -1,52 +1,49 @@
-const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
 const express = require('express');
-const mysql = require('mysql2');
 const cors = require('cors');
 const { Server } = require('socket.io');
+const { createDatabase } = require('./database');
+
+const envPath = path.join(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+  for (const line of fs.readFileSync(envPath, 'utf8').split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const separator = trimmed.indexOf('=');
+    if (separator === -1) continue;
+    const key = trimmed.slice(0, separator).trim();
+    const value = trimmed.slice(separator + 1).trim();
+    if (key && process.env[key] === undefined) process.env[key] = value;
+  }
+}
 
 const app = express();
 
-app.use(cors());
+const allowedOrigins = (process.env.CORS_ORIGINS || 'http://127.0.0.1:3000,http://localhost:3000')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Origen no permitido por CORS'));
+  },
+  credentials: true,
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
-const db = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  password: 'admin1234',
-  database: 'zen_spa',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-});
-
-function runMigrations() {
-  const filePath = path.join(__dirname, 'migrations', '2026-06-03-chat-recordatorios.sql');
-  if (!fs.existsSync(filePath)) return;
-
-  const sql = fs.readFileSync(filePath, 'utf8');
-  const statements = sql
-    .split(';')
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  statements.forEach((statement) => {
-    db.query(statement, (err) => {
-      if (err && !/already exists|Duplicate/i.test(err.message)) {
-        console.error('Migracion:', err.message);
-      }
-    });
-  });
-}
+const db = createDatabase();
 
 db.getConnection((err, connection) => {
   if (err) {
-    console.error('❌ Error conectando a MySQL:', err.message);
+    console.error('Error conectando a PostgreSQL:', err.message);
   } else {
-    console.log('✅ Conectado a MySQL correctamente');
+    console.log('Conectado a PostgreSQL correctamente');
     connection.release();
-    runMigrations();
   }
 });
 
@@ -70,7 +67,7 @@ const { runRecordatoriosJob } = require('./services/recordatoriosJob');
 
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: '*' },
+  cors: { origin: allowedOrigins, credentials: true },
 });
 
 createChatRouter.setupSocket(io, db);
@@ -93,8 +90,13 @@ app.use('/api/giftcards', giftCardsRouter(db));
 app.use('/api/resenas', resenasRouter(db));
 
 // Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/health', async (req, res) => {
+  try {
+    await db.query('SELECT 1 AS database_ok');
+    res.json({ status: 'ok', database: 'connected', timestamp: new Date().toISOString() });
+  } catch (error) {
+    res.status(503).json({ status: 'error', database: 'disconnected', error: error.message });
+  }
 });
 
 // 404
@@ -110,7 +112,7 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3001;
 
-server.listen(PORT, '127.0.0.1', () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor corriendo en http://127.0.0.1:${PORT}`);
   console.log('\n📋 APIs disponibles:');
   console.log('   GET  /api/clientes');

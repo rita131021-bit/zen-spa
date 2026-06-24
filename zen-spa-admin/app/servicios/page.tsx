@@ -1,4 +1,5 @@
 import AdminShell, { MetricCard, PageHeader } from "@/components/AdminShell"
+import Link from "next/link"
 import ServicePriceManager from "@/components/ServicePriceManager"
 import { fetchApi, Servicio } from "@/lib/api"
 
@@ -21,7 +22,7 @@ export default async function ServiciosPage() {
         eyebrow="$"
         title="Gestion de Precios y Servicios"
         subtitle="Administra los precios de tus servicios de forma rapida y sencilla."
-        action={<button className="outline-button">Historial de cambios</button>}
+        action={<Link className="outline-button" href="/reportes">Ver reportes</Link>}
       />
 
       <section className="metrics-grid four">

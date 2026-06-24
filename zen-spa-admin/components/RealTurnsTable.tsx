@@ -1,6 +1,6 @@
 "use client"
 
-import { FormEvent, useEffect, useState } from "react"
+import { useState } from "react"
 import { API_BASE, Turno } from "@/lib/api"
 
 export default function RealTurnsTable({
@@ -12,18 +12,15 @@ export default function RealTurnsTable({
   turns: Turno[]
   limit?: number
 }) {
-  const [turnos, setTurnos] = useState<Turno[]>(turns)
+  const [turnoUpdates, setTurnoUpdates] = useState<Record<number, Partial<Turno>>>({})
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editData, setEditData] = useState<{ estado: string; pago: string }>({ estado: "", pago: "" })
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
 
-  useEffect(() => {
-    setTurnos(turns)
-  }, [turns])
-
-  const rows = limit ? turnos.slice(0, limit) : turnos
+  const mergedTurns = turns.map((turn) => ({ ...turn, ...turnoUpdates[turn.id] }))
+  const rows = limit ? mergedTurns.slice(0, limit) : mergedTurns
 
   function startEdit(turn: Turno) {
     setEditingId(turn.id)
@@ -49,13 +46,10 @@ export default function RealTurnsTable({
         throw new Error(data.error || "No se pudo guardar")
       }
 
-      setTurnos((prev) =>
-        prev.map((t) =>
-          t.id === turnoId
-            ? { ...t, estado: editData.estado, pago: editData.pago }
-            : t
-        )
-      )
+      setTurnoUpdates((prev) => ({
+        ...prev,
+        [turnoId]: { estado: editData.estado, pago: editData.pago },
+      }))
 
       setMessage("Turno actualizado correctamente")
       setEditingId(null)

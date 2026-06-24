@@ -1,6 +1,7 @@
 "use client"
 
 import { FormEvent, useEffect, useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { API_BASE, Cliente, DisponibilidadSlot, Mascota, Profesional, Servicio, Turno } from "@/lib/api"
 
 type TurnosManagerProps = {
@@ -30,6 +31,7 @@ function estadoPill(estado: string) {
 }
 
 export default function TurnosManager({ initialTurnos = [] }: TurnosManagerProps) {
+  const searchParams = useSearchParams()
   const [turnos, setTurnos] = useState<Turno[]>(initialTurnos)
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [mascotas, setMascotas] = useState<Mascota[]>([])
@@ -64,14 +66,34 @@ export default function TurnosManager({ initialTurnos = [] }: TurnosManagerProps
     [mascotas, form.cliente_id]
   )
 
+  useEffect(() => {
+    const fecha = searchParams.get("fecha")
+    const hora = searchParams.get("hora")
+    const buscar = searchParams.get("buscar")
+    if (fecha || hora) {
+      setForm((current) => ({
+        ...current,
+        fecha: fecha || current.fecha,
+        hora: hora || current.hora,
+      }))
+    }
+    if (buscar) setBusqueda(buscar)
+  }, [searchParams])
+
+  useEffect(() => {
+    if (form.cliente_id && !form.mascota_id && mascotasFiltradas.length === 1) {
+      updateField("mascota_id", String(mascotasFiltradas[0].id))
+    }
+  }, [form.cliente_id, form.mascota_id, mascotasFiltradas])
+
   const turnosFiltrados = useMemo(() => {
     return turnos.filter((t) => {
       const matchEstado = filtroEstado === "todos" || t.estado === filtroEstado
       const q = busqueda.toLowerCase()
       const matchBusqueda = !q ||
-        String((t as any).cliente_nombre || "").toLowerCase().includes(q) ||
-        String((t as any).mascota_nombre || "").toLowerCase().includes(q) ||
-        String((t as any).servicio_nombre || "").toLowerCase().includes(q)
+        String(t.cliente_nombre || "").toLowerCase().includes(q) ||
+        String(t.mascota_nombre || "").toLowerCase().includes(q) ||
+        String(t.servicio_nombre || "").toLowerCase().includes(q)
       return matchEstado && matchBusqueda
     })
   }, [turnos, filtroEstado, busqueda])
@@ -142,6 +164,12 @@ export default function TurnosManager({ initialTurnos = [] }: TurnosManagerProps
     })
   }
 
+  function setQuickDate(daysFromToday: number) {
+    const date = new Date()
+    date.setDate(date.getDate() + daysFromToday)
+    updateField("fecha", date.toISOString().slice(0, 10))
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setSaving(true)
@@ -185,7 +213,7 @@ export default function TurnosManager({ initialTurnos = [] }: TurnosManagerProps
   }
 
   async function handleCancelar(turno: Turno) {
-    if (!confirm(`¿Cancelar turno de ${(turno as any).mascota_nombre || ""}?`)) return
+    if (!confirm(`¿Cancelar turno de ${turno.mascota_nombre || ""}?`)) return
     const motivo = prompt("Motivo de cancelación (opcional):") || "Cancelado por administrador"
     const res = await fetch(`${API_BASE}/api/turnos/${turno.id}/cancelar`, {
       method: "PATCH",
@@ -229,6 +257,18 @@ export default function TurnosManager({ initialTurnos = [] }: TurnosManagerProps
           </div>
         )}
         <form className="form-grid" onSubmit={handleSubmit}>
+          <div className="button-row" style={{ gridColumn: "1/-1" }}>
+            <button type="button" className="outline-button" onClick={() => setQuickDate(0)}>
+              Hoy
+            </button>
+            <button type="button" className="outline-button" onClick={() => setQuickDate(1)}>
+              Mañana
+            </button>
+            <button type="button" className="outline-button" onClick={() => setForm((current) => ({ ...emptyForm, profesional_id: current.profesional_id }))}>
+              Limpiar
+            </button>
+          </div>
+
           <label>Cliente
             <select required value={form.cliente_id} onChange={(e) => updateField("cliente_id", e.target.value)}>
               <option value="">Seleccionar cliente</option>
@@ -315,7 +355,7 @@ export default function TurnosManager({ initialTurnos = [] }: TurnosManagerProps
       </section>
 
       {/* TABLA DE TURNOS */}
-      <section className="panel-card table-card">
+      <section className="panel-card table-card" id="reservas">
         <div style={{ display: "flex", gap: "12px", marginBottom: "16px", flexWrap: "wrap", alignItems: "center" }}>
           <h3 style={{ margin: 0, flex: 1 }}>Control de Reservas</h3>
           <input type="text" placeholder="Buscar cliente, mascota..." value={busqueda} onChange={(e) => setBusqueda(e.target.value)} style={{ padding: "6px 10px", fontSize: "13px", width: "200px" }} />
@@ -351,9 +391,9 @@ export default function TurnosManager({ initialTurnos = [] }: TurnosManagerProps
                     <div style={{ fontWeight: "600" }}>{String(turno.fecha).slice(0, 10)}</div>
                     <div style={{ color: "var(--muted)" }}>{String(turno.hora).slice(0, 5)}</div>
                   </td>
-                  <td style={{ fontSize: "13px" }}>{(turno as any).cliente_nombre || "-"}</td>
-                  <td style={{ fontSize: "13px" }}>{(turno as any).mascota_nombre || "-"}</td>
-                  <td style={{ fontSize: "12px" }}>{(turno as any).servicio_nombre || "-"}</td>
+                  <td style={{ fontSize: "13px" }}>{turno.cliente_nombre || "-"}</td>
+                  <td style={{ fontSize: "13px" }}>{turno.mascota_nombre || "-"}</td>
+                  <td style={{ fontSize: "12px" }}>{turno.servicio_nombre || "-"}</td>
                   <td>
                     <select
                       value={turno.estado}
@@ -396,7 +436,7 @@ export default function TurnosManager({ initialTurnos = [] }: TurnosManagerProps
           <div style={{ background: "var(--card)", borderRadius: "12px", padding: "28px", width: "380px", display: "grid", gap: "14px" }}>
             <h3 style={{ margin: 0 }}>📅 Postergar turno</h3>
             <p style={{ margin: 0, fontSize: "13px", color: "var(--muted)" }}>
-              {(postergando as any).mascota_nombre} — {(postergando as any).servicio_nombre}
+              {postergando.mascota_nombre} — {postergando.servicio_nombre}
             </p>
             <label style={{ display: "grid", gap: "6px", fontSize: "13px" }}>
               Nueva fecha

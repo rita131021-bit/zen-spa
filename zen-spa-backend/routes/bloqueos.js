@@ -43,7 +43,7 @@ module.exports = function createBloqueoRouter(db) {
         current.setDate(current.getDate() + 1);
       }
       db.query(
-        'INSERT IGNORE INTO bloqueos_calendario (fecha, motivo, disponible, creado_por) VALUES ?',
+        'INSERT INTO bloqueos_calendario (fecha, motivo, disponible, creado_por) VALUES ? ON CONFLICT (fecha) DO NOTHING',
         [fechas],
         (err) => {
           if (err) return res.status(500).json({ error: err.message });
@@ -52,7 +52,7 @@ module.exports = function createBloqueoRouter(db) {
       );
     } else {
       db.query(
-        'INSERT IGNORE INTO bloqueos_calendario (fecha, motivo, disponible, creado_por) VALUES (?, ?, FALSE, ?)',
+        'INSERT INTO bloqueos_calendario (fecha, motivo, disponible, creado_por) VALUES (?, ?, FALSE, ?) ON CONFLICT (fecha) DO NOTHING',
         [fecha, motivoFinal, creado_por || 'admin'],
         (err, result) => {
           if (err) return res.status(500).json({ error: err.message });

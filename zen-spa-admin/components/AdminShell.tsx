@@ -39,7 +39,7 @@ export default function AdminShell({ children, aside }: AdminShellProps) {
             <div className="right-actions">
               <NewTurnButton />
             </div>
-            {aside ?? <PetPanel />}
+            {aside ?? <QuickAccessPanel />}
           </aside>
         </div>
       </section>
@@ -81,7 +81,7 @@ export function MetricCard({
   label: string
   value: string
   detail: string
-  tone?: "purple" | "green" | "yellow" | "red" | "blue"
+  tone?: "purple" | "green" | "yellow" | "red" | "blue" | "gray"
 }) {
   return (
     <article className="metric-card">
@@ -92,49 +92,24 @@ export function MetricCard({
   )
 }
 
-function NotificacionesButton() {
-  const [open, setOpen] = useState(false)
-  const notifs = [
-    { id: 1, texto: "Turno pendiente de confirmar", link: "/turnos", color: "#facc15" },
-    { id: 2, texto: "Nuevo cliente registrado",     link: "/clientes", color: "#22c55e" },
-    { id: 3, texto: "Recordatorio programado",      link: "/recordatorios", color: "#a78bfa" },
-  ]
+function QuickAccessPanel() {
   return (
-    <div style={{ position: "relative" }}>
-      <button
-        className="icon-button"
-        aria-label="Notificaciones"
-        onClick={() => setOpen(!open)}
-        style={{ cursor: "pointer" }}
-      >
-        <span>🔔</span>
-        <small>{notifs.length}</small>
-      </button>
-      {open && (
-        <div style={{
-          position: "absolute", top: "48px", right: 0, width: "280px",
-          background: "var(--card)", border: "1px solid rgba(126,34,206,0.4)",
-          borderRadius: "10px", boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-          zIndex: 1000, overflow: "hidden",
-        }}>
-          <div style={{ padding: "12px 16px", borderBottom: "1px solid rgba(126,34,206,0.2)", fontWeight: "600", fontSize: "13px" }}>
-            🔔 Notificaciones
-          </div>
-          {notifs.map((n) => (
-            <Link key={n.id} href={n.link} onClick={() => setOpen(false)}
-              style={{ display: "flex", gap: "10px", padding: "12px 16px", textDecoration: "none",
-                borderBottom: "1px solid rgba(255,255,255,0.05)", alignItems: "flex-start" }}>
-              <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: n.color, marginTop: "5px", flexShrink: 0 }} />
-              <span style={{ fontSize: "13px", color: "#e9d5ff" }}>{n.texto}</span>
-            </Link>
-          ))}
-          <Link href="/recordatorios" onClick={() => setOpen(false)}
-            style={{ display: "block", padding: "10px 16px", textAlign: "center", fontSize: "12px", color: "var(--muted)", textDecoration: "none" }}>
-            Ver todos →
-          </Link>
-        </div>
-      )}
-    </div>
+    <section className="panel-card quick-summary">
+      <h3>Accesos rápidos</h3>
+      <div className="quick-links">
+        <Link href="/turnos">Gestionar turnos</Link>
+        <Link href="/calendario">Abrir calendario</Link>
+        <Link href="/recordatorios">Enviar recordatorios</Link>
+      </div>
+    </section>
+  )
+}
+
+function NotificacionesButton() {
+  return (
+    <Link className="icon-button" href="/recordatorios" aria-label="Abrir recordatorios" title="Recordatorios">
+      <span aria-hidden="true">&#128276;</span>
+    </Link>
   )
 }
 

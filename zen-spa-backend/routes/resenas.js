@@ -138,11 +138,11 @@ module.exports = function createResenasRouter(db) {
     const sql = `
       SELECT
         COUNT(*) as total,
-        SUM(estado = 'pendiente')  as pendientes,
-        SUM(estado = 'aprobada')   as aprobadas,
-        SUM(estado = 'rechazada')  as rechazadas,
+        COUNT(*) FILTER (WHERE estado = 'pendiente') as pendientes,
+        COUNT(*) FILTER (WHERE estado = 'aprobada') as aprobadas,
+        COUNT(*) FILTER (WHERE estado = 'rechazada') as rechazadas,
         ROUND(AVG(CASE WHEN estado = 'aprobada' THEN calificacion END), 2) as promedio,
-        SUM(destacada) as destacadas
+        COUNT(*) FILTER (WHERE destacada) as destacadas
       FROM resenas
     `;
     db.query(sql, (err, results) => {

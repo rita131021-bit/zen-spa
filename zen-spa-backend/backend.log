@@ -2,5 +2,23 @@
 > zen-spa-backend@1.0.0 dev
 > node index.js
 
-Servidor corriendo en http://localhost:3001
-âœ… Conectado a MySQL correctamente
+🚀 Servidor corriendo en http://127.0.0.1:3001
+
+📋 APIs disponibles:
+   GET  /api/clientes
+   POST /api/clientes
+   GET  /api/mascotas
+   POST /api/mascotas
+   GET  /api/servicios
+   POST /api/servicios
+   GET  /api/profesionales
+   GET  /api/caniles
+   GET  /api/turnos
+   POST /api/turnos
+   PUT  /api/turnos/:id
+   GET  /api/disponibilidad?fecha=2026-06-10
+   GET  /api/bloqueos
+   POST /api/bloqueos
+   GET  /health
+
+Conectado a PostgreSQL correctamente

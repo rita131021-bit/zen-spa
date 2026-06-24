@@ -50,7 +50,7 @@ export default function ClientesManager({
         `${b.fecha}${b.hora}`.localeCompare(`${a.fecha}${a.hora}`)
       )
       const last = sorted[0]
-      const total = clientTurns.reduce((sum, t) => sum + Number((t as any).servicio_precio || 0), 0)
+      const total = clientTurns.reduce((sum, t) => sum + Number(t.servicio_precio || 0), 0)
       return {
         cliente,
         pets,

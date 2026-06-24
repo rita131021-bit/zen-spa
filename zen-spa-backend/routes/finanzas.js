@@ -94,7 +94,7 @@ module.exports = function createFinanzasRouter(db) {
         COALESCE(SUM(t.precio_final) + SUM(t.descuento_porcentaje * t.precio_unitario / 100), 0) as ingresos_brutos
       FROM turnos t
       WHERE t.estado IN ('Confirmado', 'Completado')
-      AND DATE(t.fecha) >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+      AND DATE(t.fecha) >= CURRENT_DATE - INTERVAL '30 days'
       GROUP BY DATE(t.fecha)
       ORDER BY fecha DESC
     `;

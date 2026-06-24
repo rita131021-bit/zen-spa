@@ -150,7 +150,7 @@ export default function CentroMensajes() {
       <section className="metrics-grid five">
         <MetricCard label="Conversaciones" value={String(conversaciones.length)} detail="Clientes con chat" tone="purple" />
         <MetricCard label="Con mensajes"   value={String(sinLeer)}               detail="Activas"          tone="green" />
-        <MetricCard label="Estado"          value={conectado ? "En vivo" : "Off"} detail="Conexión socket"  tone={conectado ? "green" : "gray"} />
+        <MetricCard label="Estado"          value={conectado ? "En vivo" : "Off"} detail="Conexión socket"  tone={conectado ? "green" : "red"} />
       </section>
 
       <section className="panel-card" style={{ padding: 0, overflow: "hidden" }}>

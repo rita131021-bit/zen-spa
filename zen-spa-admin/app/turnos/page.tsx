@@ -1,5 +1,5 @@
+import { Suspense } from "react"
 import AdminShell, { PageHeader } from "@/components/AdminShell"
-import ScheduleBlocksPanel from "@/components/ScheduleBlocksPanel"
 import TurnosManager from "@/components/TurnosManager"
 import { fetchApi, Turno } from "@/lib/api"
 
@@ -9,14 +9,13 @@ export default async function TurnosPage() {
   return (
     <AdminShell>
       <PageHeader
-        eyebrow="spark"
-        title="Gestor de Horarios, Bloqueos y Vacaciones"
-        subtitle="Gestiona disponibilidad, bloquea turnos o configura tus vacaciones."
+        eyebrow="Agenda"
+        title="Gestión de Turnos"
+        subtitle="Administra reservas, estados, pagos y asignaciones."
       />
-
-      <ScheduleBlocksPanel />
-
-      <TurnosManager initialTurnos={turnos} />
+      <Suspense fallback={<section className="panel-card">Cargando turnos...</section>}>
+        <TurnosManager initialTurnos={turnos} />
+      </Suspense>
     </AdminShell>
   )
 }

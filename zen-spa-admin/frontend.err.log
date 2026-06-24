@@ -1,0 +1,10 @@
+[browser] ⨯ unhandledRejection: TypeError: Failed to fetch
+    at loadCatalogs (components\TurnosManager.tsx:103:7)
+    at TurnosManager.useEffect (components\TurnosManager.tsx:124:21)
+  101 |   async function loadCatalogs() {
+  102 |     const [turnosRes, clientesRes, mascotasRes, serviciosRes, profesionalesRes] = await P...
+> 103 |       fetch(`${API_BASE}/api/turnos`, { cache: "no-store" }),
+      |       ^
+  104 |       fetch(`${API_BASE}/api/clientes`, { cache: "no-store" }),
+  105 |       fetch(`${API_BASE}/api/mascotas`, { cache: "no-store" }),
+  106 |       fetch(`${API_BASE}/api/servicios`, { cache: "no-store" }),

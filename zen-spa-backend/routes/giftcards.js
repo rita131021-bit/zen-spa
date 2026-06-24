@@ -65,7 +65,7 @@ module.exports = function createGiftCardsRouter(db) {
 
       // Verificar vencimiento
       if (gc.fecha_vencimiento && new Date(gc.fecha_vencimiento) < new Date()) {
-        db.query('UPDATE gift_cards SET estado = "vencida" WHERE id = ?', [gc.id]);
+        db.query("UPDATE gift_cards SET estado = 'vencida' WHERE id = ?", [gc.id]);
         return res.status(400).json({ error: 'Gift card vencida' });
       }
 
@@ -88,7 +88,7 @@ module.exports = function createGiftCardsRouter(db) {
 
   // ANULAR gift card
   router.delete('/:id', (req, res) => {
-    db.query('UPDATE gift_cards SET estado = "anulada" WHERE id = ?', [req.params.id], (err) => {
+    db.query("UPDATE gift_cards SET estado = 'anulada' WHERE id = ?", [req.params.id], (err) => {
       if (err) return res.status(500).json({ error: err.message });
       res.json({ mensaje: '✅ Gift card anulada' });
     });

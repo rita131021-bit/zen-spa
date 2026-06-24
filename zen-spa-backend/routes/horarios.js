@@ -25,7 +25,7 @@ async function ensureSeed(db) {
   const values = [];
   for (const dia of days) {
     for (const hora of defaultHours) {
-      values.push([dia, hora, 1]);
+      values.push([dia, hora, true]);
     }
   }
 
@@ -40,7 +40,7 @@ module.exports = (db) => {
   router.get('/', async (req, res) => {
     try {
       await ensureSeed(db);
-      const results = await query(db, 'SELECT * FROM horarios ORDER BY FIELD(dia, ?, ?, ?, ?, ?, ?, ?), hora', days);
+      const results = await query(db, 'SELECT * FROM horarios ORDER BY array_position(ARRAY[?, ?, ?, ?, ?, ?, ?]::text[], dia), hora', days);
       res.json(results);
     } catch (err) {
       res.status(500).json({ error: err.message });
@@ -57,19 +57,19 @@ module.exports = (db) => {
       const horaNorm = normalizeTime(hora);
       const existing = await query(
         db,
-        'SELECT * FROM horarios WHERE dia = ? AND TIME_FORMAT(hora, "%H:%i") = ? LIMIT 1',
+        "SELECT * FROM horarios WHERE dia = ? AND to_char(hora, 'HH24:MI') = ? LIMIT 1",
         [dia, horaNorm]
       );
 
-      const flag = disponible === undefined ? null : Number(Boolean(disponible));
+      const flag = disponible === undefined ? null : Boolean(disponible);
 
       if (existing.length > 0) {
-        const next = flag === null ? (existing[0].disponible ? 0 : 1) : flag;
+        const next = flag === null ? !existing[0].disponible : flag;
         await query(db, 'UPDATE horarios SET disponible = ? WHERE id = ?', [next, existing[0].id]);
         return res.json({ mensaje: 'Horario actualizado', disponible: Boolean(next) });
       }
 
-      const next = flag === null ? 1 : flag;
+      const next = flag === null ? true : flag;
       await query(db, 'INSERT INTO horarios (dia, hora, disponible) VALUES (?, ?, ?)', [dia, `${horaNorm}:00`, next]);
       res.json({ mensaje: 'Horario creado', disponible: Boolean(next) });
     } catch (err) {

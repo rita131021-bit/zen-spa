@@ -73,7 +73,7 @@ module.exports = (db) => {
       }
 
       // 2. Verificar si es feriado no laborable
-      const feriados = await query(db, 'SELECT * FROM feriados WHERE fecha = ? AND no_laborable = 1', [fecha]);
+      const feriados = await query(db, 'SELECT * FROM feriados WHERE fecha = ? AND no_laborable = TRUE', [fecha]);
       if (feriados.length > 0) {
         return res.status(409).json({
           error: 'No se puede reservar en feriado no laborable',
@@ -131,7 +131,7 @@ module.exports = (db) => {
       if (!canil_id) {
         const servicio = await query(db, 'SELECT * FROM servicios WHERE id = ?', [servicio_id]);
         if (servicio.length > 0 && servicio[0].requiere_canil) {
-          const caniles = await query(db, 'SELECT * FROM caniles WHERE activo = 1');
+          const caniles = await query(db, 'SELECT * FROM caniles WHERE activo = TRUE');
           const canilesActivos = caniles.length;
           const canilesOcupados = new Set(
             turnosEnHorario
@@ -266,7 +266,7 @@ module.exports = (db) => {
   router.patch('/:id/postergar', (req, res) => {
     const { fecha, hora, motivo } = req.body;
     if (!fecha || !hora) return res.status(400).json({ error: 'Nueva fecha y hora son obligatorias' });
-    const sql = "UPDATE turnos SET fecha = ?, hora = ?, estado = 'Pendiente', observaciones = CONCAT(IFNULL(observaciones,''), ' | Postergado: ', ?) WHERE id = ?";
+    const sql = "UPDATE turnos SET fecha = ?, hora = ?, estado = 'Pendiente', observaciones = COALESCE(observaciones,'') || ' | Postergado: ' || ? WHERE id = ?";
     db.query(sql, [fecha, hora, motivo || 'Sin motivo', req.params.id], (err) => {
       if (err) return res.status(500).json({ error: err.message });
       res.json({ mensaje: '✅ Turno postergado correctamente' });
@@ -276,7 +276,7 @@ module.exports = (db) => {
   // CANCELAR TURNO
   router.patch('/:id/cancelar', (req, res) => {
     const { motivo } = req.body;
-    const sql = "UPDATE turnos SET estado = 'Cancelado', observaciones = CONCAT(IFNULL(observaciones,''), ' | Cancelado: ', ?) WHERE id = ?";
+    const sql = "UPDATE turnos SET estado = 'Cancelado', observaciones = COALESCE(observaciones,'') || ' | Cancelado: ' || ? WHERE id = ?";
     db.query(sql, [motivo || 'Cancelado por administrador', req.params.id], (err) => {
       if (err) return res.status(500).json({ error: err.message });
       res.json({ mensaje: '✅ Turno cancelado correctamente' });

@@ -1,6 +1,6 @@
 "use client"
 
-import { FormEvent, useEffect, useMemo, useState } from "react"
+import { FormEvent, Fragment, useEffect, useMemo, useState } from "react"
 import { API_BASE, Bloqueo, Horario } from "@/lib/api"
 
 const days  = ["Lunes","Martes","Miercoles","Jueves","Viernes","Sabado","Domingo"]
@@ -145,8 +145,8 @@ export default function ScheduleBlocksPanel() {
 
           {/* Filas de horas */}
           {hours.map((hora) => (
-            <>
-              <div key={`h-${hora}`} style={{ fontSize: "12px", color: "var(--muted)", display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: "8px" }}>
+            <Fragment key={hora}>
+              <div style={{ fontSize: "12px", color: "var(--muted)", display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: "8px" }}>
                 {hora}
               </div>
               {days.map((dia) => {
@@ -176,7 +176,7 @@ export default function ScheduleBlocksPanel() {
                   </button>
                 )
               })}
-            </>
+            </Fragment>
           ))}
         </div>
 

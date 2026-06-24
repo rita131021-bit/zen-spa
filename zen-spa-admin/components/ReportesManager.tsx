@@ -2,20 +2,20 @@
 
 import { useMemo, useState } from "react"
 import { MetricCard, PageHeader } from "@/components/AdminShell"
-import { Cliente, Mascota, Turno } from "@/lib/api"
+import { Cliente, Mascota, Servicio, Turno } from "@/lib/api"
 
 type Props = {
   initialTurnos:    Turno[]
   initialClientes:  Cliente[]
   initialMascotas:  Mascota[]
-  initialServicios: any[]
+  initialServicios: Servicio[]
 }
 
 type Tab = "resumen" | "servicios" | "clientes" | "mascotas" | "finanzas"
 
 function normalizeDate(v: string | Date) { return String(v).slice(0, 10) }
 
-export default function ReportesManager({ initialTurnos, initialClientes, initialMascotas, initialServicios }: Props) {
+export default function ReportesManager({ initialTurnos, initialMascotas }: Props) {
   const [tab,       setTab]       = useState<Tab>("resumen")
   const [periodoI,  setPeriodoI]  = useState("")
   const [periodoF,  setPeriodoF]  = useState("")
@@ -37,15 +37,15 @@ export default function ReportesManager({ initialTurnos, initialClientes, initia
   const cancelados  = turnos.filter((t) => t.estado === "Cancelado")
   const pendientes  = turnos.filter((t) => t.estado === "Pendiente")
 
-  const ingresos = completados.reduce((s, t) => s + Number((t as any).precio_final || (t as any).servicio_precio || 0), 0)
+  const ingresos = completados.reduce((s, t) => s + Number(t.precio_final || t.servicio_precio || 0), 0)
   const ticketPromedio = completados.length ? ingresos / completados.length : 0
 
   // Ingresos por servicio
   const ingresosPorServicio = useMemo(() => {
     const map = new Map<string, { cantidad: number; total: number }>()
     for (const t of completados) {
-      const nombre = (t as any).servicio_nombre || "Sin servicio"
-      const precio = Number((t as any).precio_final || (t as any).servicio_precio || 0)
+      const nombre = t.servicio_nombre || "Sin servicio"
+      const precio = Number(t.precio_final || t.servicio_precio || 0)
       const prev   = map.get(nombre) || { cantidad: 0, total: 0 }
       map.set(nombre, { cantidad: prev.cantidad + 1, total: prev.total + precio })
     }
@@ -75,7 +75,7 @@ export default function ReportesManager({ initialTurnos, initialClientes, initia
     const map = new Map<number, { nombre: string; cantidad: number }>()
     for (const t of turnos) {
       if (!t.cliente_id) continue
-      const nombre = (t as any).cliente_nombre || `Cliente ${t.cliente_id}`
+      const nombre = t.cliente_nombre || `Cliente ${t.cliente_id}`
       const prev   = map.get(t.cliente_id) || { nombre, cantidad: 0 }
       map.set(t.cliente_id, { nombre, cantidad: prev.cantidad + 1 })
     }
@@ -87,8 +87,8 @@ export default function ReportesManager({ initialTurnos, initialClientes, initia
     const map = new Map<number, { nombre: string; especie: string; cantidad: number }>()
     for (const t of turnos) {
       if (!t.mascota_id) continue
-      const nombre  = (t as any).mascota_nombre || `Mascota ${t.mascota_id}`
-      const especie = (t as any).mascota_especie || ""
+      const nombre  = t.mascota_nombre || `Mascota ${t.mascota_id}`
+      const especie = t.mascota_especie || ""
       const prev    = map.get(t.mascota_id) || { nombre, especie, cantidad: 0 }
       map.set(t.mascota_id, { nombre, especie, cantidad: prev.cantidad + 1 })
     }
@@ -110,11 +110,11 @@ export default function ReportesManager({ initialTurnos, initialClientes, initia
       ["Fecha","Cliente","Mascota","Servicio","Estado","Precio"],
       ...turnos.map((t) => [
         normalizeDate(String(t.fecha)),
-        (t as any).cliente_nombre || "",
-        (t as any).mascota_nombre || "",
-        (t as any).servicio_nombre || "",
+        t.cliente_nombre || "",
+        t.mascota_nombre || "",
+        t.servicio_nombre || "",
         t.estado || "",
-        (t as any).precio_final || (t as any).servicio_precio || "0",
+        t.precio_final || t.servicio_precio || "0",
       ])
     ]
     const csv  = rows.map((r) => r.join(",")).join("\n")
@@ -340,8 +340,8 @@ export default function ReportesManager({ initialTurnos, initialClientes, initia
                   .map((t) => (
                     <tr key={t.id}>
                       <td style={{ fontSize: "12px" }}>{normalizeDate(String(t.fecha))}</td>
-                      <td style={{ fontSize: "12px" }}>{(t as any).cliente_nombre || "—"}</td>
-                      <td style={{ fontSize: "12px" }}>{(t as any).servicio_nombre || "—"}</td>
+                      <td style={{ fontSize: "12px" }}>{t.cliente_nombre || "—"}</td>
+                      <td style={{ fontSize: "12px" }}>{t.servicio_nombre || "—"}</td>
                       <td>
                         <span className={
                           t.estado === "Completado" || t.estado === "Confirmado" ? "pill green" :

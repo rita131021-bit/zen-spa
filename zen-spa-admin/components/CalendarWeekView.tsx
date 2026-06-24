@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { Fragment, useMemo, useState } from "react"
 import { PageHeader } from "@/components/AdminShell"
 import { Bloqueo, Turno } from "@/lib/api"
 
@@ -160,10 +160,9 @@ export default function CalendarWeekView({ initialTurnos, initialBloqueos }: Cal
 
           {/* Filas de horas */}
           {hours.map((hour) => (
-            <>
+            <Fragment key={hour}>
               {/* Etiqueta hora */}
               <div
-                key={`h-${hour}`}
                 style={{ fontSize: "11px", color: "var(--muted)", textAlign: "right", paddingRight: "8px", paddingTop: "6px", alignSelf: "start" }}
               >
                 {hour}
@@ -200,11 +199,32 @@ export default function CalendarWeekView({ initialTurnos, initialBloqueos }: Cal
                       </div>
                     )}
 
+                    {items.length === 0 && !isBloqueado && (
+                      <Link
+                        href={`/turnos?fecha=${iso}&hora=${hour}#nuevo-turno`}
+                        title={`Crear turno el ${iso} a las ${hour}`}
+                        style={{
+                          position: "absolute",
+                          inset: "2px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          border: "1px dashed rgba(148,163,184,0.22)",
+                          borderRadius: "5px",
+                          color: "rgba(226,232,240,0.38)",
+                          fontSize: "12px",
+                          textDecoration: "none",
+                        }}
+                      >
+                        +
+                      </Link>
+                    )}
+
                     {items.map((turno) => {
                       const colors = eventColor(turno.estado || "Pendiente")
-                      const nombre  = (turno as any).mascota_nombre  || turno.mascota_nombre  || "Mascota"
-                      const servicio = (turno as any).servicio_nombre || turno.servicio_nombre || "Turno"
-                      const cliente  = (turno as any).cliente_nombre  || ""
+                      const nombre  = turno.mascota_nombre  || "Mascota"
+                      const servicio = turno.servicio_nombre || "Turno"
+                      const cliente  = turno.cliente_nombre  || ""
                       return (
                         <div
                           key={turno.id}
@@ -231,7 +251,7 @@ export default function CalendarWeekView({ initialTurnos, initialBloqueos }: Cal
                   </div>
                 )
               })}
-            </>
+            </Fragment>
           ))}
         </div>
       </section>
@@ -269,11 +289,11 @@ export default function CalendarWeekView({ initialTurnos, initialBloqueos }: Cal
                   <div key={turno.id} style={{ fontSize: "12px", display: "flex", gap: "8px", alignItems: "center" }}>
                     <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: colors.border, flexShrink: 0 }} />
                     <div>
-                      <strong>{(turno as any).mascota_nombre || "Mascota"}</strong>
+                      <strong>{turno.mascota_nombre || "Mascota"}</strong>
                       <span style={{ color: "var(--muted)" }}>
                         {" "}— {String(turno.fecha).slice(0, 10)} {normalizeHour(String(turno.hora))}
                       </span>
-                      <div style={{ color: "var(--muted)", fontSize: "11px" }}>{(turno as any).servicio_nombre || ""}</div>
+                      <div style={{ color: "var(--muted)", fontSize: "11px" }}>{turno.servicio_nombre || ""}</div>
                     </div>
                   </div>
                 )

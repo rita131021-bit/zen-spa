@@ -15,19 +15,19 @@ module.exports = (db) => {
   router.get('/resumen', async (req, res) => {
     try {
       const [hoy, pendientes, enviadosHoy] = await Promise.all([
-        query(db, `SELECT COUNT(*) as total FROM turnos WHERE fecha = CURDATE()`),
+        query(db, `SELECT COUNT(*) as total FROM turnos WHERE fecha = CURRENT_DATE`),
         query(db, `SELECT COUNT(*) as total FROM recordatorios WHERE estado = 'pendiente'`),
         query(
           db,
           `SELECT COUNT(*) as total FROM recordatorios
-           WHERE estado = 'enviado' AND DATE(enviado_en) = CURDATE()`
+           WHERE estado = 'enviado' AND DATE(enviado_en) = CURRENT_DATE`
         ),
       ]);
 
       const pendientesConfirmacion = await query(
         db,
         `SELECT COUNT(*) as total FROM turnos
-         WHERE fecha >= CURDATE() AND estado = 'Pendiente'`
+         WHERE fecha >= CURRENT_DATE AND estado = 'Pendiente'`
       );
 
       res.json({
@@ -72,7 +72,7 @@ module.exports = (db) => {
          LEFT JOIN clientes c ON t.cliente_id = c.id
          LEFT JOIN mascotas m ON t.mascota_id = m.id
          LEFT JOIN servicios s ON t.servicio_id = s.id
-         WHERE t.fecha >= CURDATE() AND t.estado <> 'Cancelado'
+         WHERE t.fecha >= CURRENT_DATE AND t.estado <> 'Cancelado'
          ORDER BY t.fecha ASC, t.hora ASC
          LIMIT 20`
       );
@@ -86,7 +86,7 @@ module.exports = (db) => {
     try {
       await query(
         db,
-        `UPDATE recordatorios SET estado = 'enviado', enviado_en = NOW() WHERE id = ?`,
+        `UPDATE recordatorios SET estado = 'enviado', enviado_en = CURRENT_TIMESTAMP WHERE id = ?`,
         [req.params.id]
       );
       const rows = await query(db, 'SELECT * FROM recordatorios WHERE id = ?', [req.params.id]);
