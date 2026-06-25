@@ -101,17 +101,6 @@ export default function CentroMensajes() {
     const mensaje = texto.trim()
     setTexto("")
 
-    // Optimista: agregar localmente
-    const tempMsg: Mensaje = {
-      id: Date.now(),
-      cliente_id: activo.cliente_id,
-      autor_tipo: "admin",
-      autor_nombre: "Romina",
-      mensaje,
-      creado_en: new Date().toISOString(),
-    }
-    setMensajes((prev) => [...prev, tempMsg])
-
     try {
       await fetch(`${API_BASE}/api/chat/${activo.cliente_id}`, {
         method: "POST",
