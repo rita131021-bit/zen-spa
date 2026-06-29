@@ -112,6 +112,26 @@ function createChatRouter(db, io) {
     }
   });
 
+  api.delete('/antiguos', async (req, res) => {
+    try {
+      const diasRaw = Number(req.query.dias || 30);
+      const dias = Math.max(1, Math.min(3650, Number.isFinite(diasRaw) ? Math.floor(diasRaw) : 30));
+      const result = await query(
+        db,
+        `DELETE FROM mensajes_chat WHERE creado_en < DATE_SUB(NOW(), INTERVAL ${dias} DAY)`
+      );
+
+      const payload = { dias, eliminados: result.affectedRows || 0 };
+      if (io) {
+        io.to('admin').emit('mensajes:antiguos_eliminados', payload);
+      }
+
+      res.json({ mensaje: 'Mensajes antiguos eliminados', data: payload });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   api.delete('/:clienteId', async (req, res) => {
     try {
       await query(db, 'DELETE FROM mensajes_chat WHERE cliente_id = ?', [req.params.clienteId]);
