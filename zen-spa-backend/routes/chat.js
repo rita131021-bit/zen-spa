@@ -118,7 +118,7 @@ function createChatRouter(db, io) {
       const dias = Math.max(1, Math.min(3650, Number.isFinite(diasRaw) ? Math.floor(diasRaw) : 30));
       const result = await query(
         db,
-        `DELETE FROM mensajes_chat WHERE creado_en < DATE_SUB(NOW(), INTERVAL ${dias} DAY)`
+        `DELETE FROM mensajes_chat WHERE creado_en < NOW() - INTERVAL '${dias} days'`
       );
 
       const payload = { dias, eliminados: result.affectedRows || 0 };
