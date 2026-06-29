@@ -84,6 +84,50 @@ function createChatRouter(db, io) {
     }
   });
 
+  api.delete('/mensaje/:mensajeId', async (req, res) => {
+    try {
+      const rows = await query(
+        db,
+        'SELECT cliente_id FROM mensajes_chat WHERE id = ? LIMIT 1',
+        [req.params.mensajeId]
+      );
+      const mensaje = Array.isArray(rows) ? rows[0] : null;
+      if (!mensaje) return res.status(404).json({ error: 'Mensaje no encontrado' });
+
+      await query(db, 'DELETE FROM mensajes_chat WHERE id = ?', [req.params.mensajeId]);
+
+      const payload = {
+        id: Number(req.params.mensajeId),
+        cliente_id: Number(mensaje.cliente_id),
+      };
+
+      if (io) {
+        io.to(`cliente-${payload.cliente_id}`).emit('mensaje:eliminado', payload);
+        io.to('admin').emit('mensaje:eliminado', payload);
+      }
+
+      res.json({ mensaje: 'Mensaje eliminado', data: payload });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  api.delete('/:clienteId', async (req, res) => {
+    try {
+      await query(db, 'DELETE FROM mensajes_chat WHERE cliente_id = ?', [req.params.clienteId]);
+
+      const payload = { cliente_id: Number(req.params.clienteId) };
+      if (io) {
+        io.to(`cliente-${req.params.clienteId}`).emit('conversacion:limpiada', payload);
+        io.to('admin').emit('conversacion:limpiada', payload);
+      }
+
+      res.json({ mensaje: 'Conversacion limpiada', data: payload });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   return api;
 }
 
