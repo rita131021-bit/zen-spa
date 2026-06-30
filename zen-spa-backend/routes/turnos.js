@@ -254,6 +254,17 @@ module.exports = (db) => {
     });
   });
 
+  router.patch('/:id/whatsapp-enviado', (req, res) => {
+    const fecha = new Date().toISOString();
+    const marca = ' | WhatsApp enviado: ' + fecha;
+    const sql = "UPDATE turnos SET observaciones = CONCAT(COALESCE(observaciones, ''), ?) WHERE id = ?";
+
+    db.query(sql, [marca, req.params.id], (err) => {
+      if (err) return res.status(500).json({ error: err.message });
+      res.json({ mensaje: '✅ WhatsApp marcado como enviado', whatsapp_enviado_en: fecha });
+    });
+  });
+
   router.delete('/:id', (req, res) => {
     db.query('DELETE FROM turnos WHERE id = ?', [req.params.id], (err) => {
       if (err) return res.status(500).json({ error: err.message });
