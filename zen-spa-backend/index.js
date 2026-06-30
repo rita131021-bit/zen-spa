@@ -64,6 +64,7 @@ const createChatRouter = require('./routes/chat');
 const giftCardsRouter = require('./routes/giftcards');
 const resenasRouter = require('./routes/resenas');
 const bookingsRouter = require('./routes/bookings');
+const localesRouter = require('./routes/locales');
 const { runRecordatoriosJob } = require('./services/recordatoriosJob');
 
 const server = http.createServer(app);
@@ -90,6 +91,7 @@ app.use('/api/chat', createChatRouter(db, io));
 app.use('/api/giftcards', giftCardsRouter(db));
 app.use('/api/resenas', resenasRouter(db));
 app.use('/api/bookings', bookingsRouter(db));
+app.use('/api/locales', localesRouter(db));
 app.use('/api/availability', bookingsRouter(db));
 app.use('/api/prices', bookingsRouter(db));
 
