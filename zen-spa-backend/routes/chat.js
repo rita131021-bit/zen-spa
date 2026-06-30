@@ -24,6 +24,18 @@ function createChatRouter(db, io) {
             LIMIT 1
           ) as ultimo_mensaje,
           (
+            SELECT autor_tipo FROM mensajes_chat mc
+            WHERE mc.cliente_id = c.id
+            ORDER BY mc.creado_en DESC
+            LIMIT 1
+          ) as ultimo_autor_tipo,
+          (
+            SELECT autor_nombre FROM mensajes_chat mc
+            WHERE mc.cliente_id = c.id
+            ORDER BY mc.creado_en DESC
+            LIMIT 1
+          ) as ultimo_autor_nombre,
+          (
             SELECT creado_en FROM mensajes_chat mc
             WHERE mc.cliente_id = c.id
             ORDER BY mc.creado_en DESC
