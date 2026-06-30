@@ -257,7 +257,7 @@ module.exports = (db) => {
   router.patch('/:id/whatsapp-enviado', (req, res) => {
     const fecha = new Date().toISOString();
     const marca = ' | WhatsApp enviado: ' + fecha;
-    const sql = "UPDATE turnos SET observaciones = CONCAT(COALESCE(observaciones, ''), ?) WHERE id = ?";
+    const sql = "UPDATE turnos SET observaciones = COALESCE(observaciones, '') || CAST(? AS TEXT) WHERE id = ?";
 
     db.query(sql, [marca, req.params.id], (err) => {
       if (err) return res.status(500).json({ error: err.message });
