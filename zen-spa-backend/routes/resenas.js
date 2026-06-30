@@ -28,6 +28,15 @@ const upload = multer({
 
 module.exports = function createResenasRouter(db) {
   const router = express.Router();
+  let schemaReady = false;
+  function ensureSchema() {
+    if (schemaReady) return;
+    db.query('ALTER TABLE resenas ADD COLUMN IF NOT EXISTS mascota_nombre VARCHAR(100)', [], (err) => {
+      if (err) console.error('No se pudo verificar mascota_nombre:', err.message);
+    });
+    schemaReady = true;
+  }
+  ensureSchema();
 
   // Servir las fotos estáticamente
   router.use('/fotos', express.static(uploadDir));
@@ -37,8 +46,15 @@ module.exports = function createResenasRouter(db) {
   // ---------------------------------------------------------------------
 
   // Crear nueva reseña (con hasta 5 fotos)
-  router.post('/', upload.array('fotos', 5), (req, res) => {
-    const { nombre_cliente, email, calificacion, comentario, cliente_id } = req.body;
+  router.post('/', upload.fields([{ name: 'fotos', maxCount: 5 }, { name: 'foto', maxCount: 1 }, { name: 'photo', maxCount: 1 }]), (req, res) => {
+    ensureSchema();
+    const body = req.body || {};
+    const nombre_cliente = String(body.nombre_cliente || body.name || '').trim();
+    const mascota_nombre = String(body.mascota_nombre || body.mascota || body.pet || '').trim() || null;
+    const email = String(body.email || '').trim() || null;
+    const calificacion = body.calificacion || body.stars;
+    const comentario = String(body.comentario || body.text || '').trim();
+    const cliente_id = body.cliente_id || null;
 
     if (!nombre_cliente || !calificacion || !comentario) {
       return res.status(400).json({ error: 'nombre_cliente, calificacion y comentario son obligatorios' });
@@ -48,14 +64,19 @@ module.exports = function createResenasRouter(db) {
       return res.status(400).json({ error: 'calificacion debe ser entre 1 y 5' });
     }
 
-    const sql = `INSERT INTO resenas (cliente_id, nombre_cliente, email, calificacion, comentario, estado)
-                  VALUES (?, ?, ?, ?, ?, 'pendiente')`;
+    const sql = `INSERT INTO resenas (cliente_id, nombre_cliente, mascota_nombre, email, calificacion, comentario, estado)
+                  VALUES (?, ?, ?, ?, ?, ?, 'pendiente') RETURNING id`;
 
-    db.query(sql, [cliente_id || null, nombre_cliente, email || null, cal, comentario], (err, result) => {
+    db.query(sql, [cliente_id || null, nombre_cliente, mascota_nombre, email || null, cal, comentario], (err, result) => {
       if (err) return res.status(500).json({ error: err.message });
 
-      const resenaId = result.insertId;
-      const files = req.files || [];
+      const resenaId = result?.insertId || result?.rows?.[0]?.id || result?.[0]?.id;
+      const groupedFiles = req.files || {};
+      const files = Array.isArray(groupedFiles) ? groupedFiles : [
+        ...(groupedFiles.fotos || []),
+        ...(groupedFiles.foto || []),
+        ...(groupedFiles.photo || []),
+      ];
 
       if (files.length === 0) {
         return res.status(201).json({ mensaje: '✅ Reseña enviada, pendiente de aprobación', id: resenaId, fotos: [] });
@@ -76,7 +97,7 @@ module.exports = function createResenasRouter(db) {
   // Listar reseñas APROBADAS (para mostrar en la web pública)
   router.get('/publicas', (req, res) => {
     const sqlResenas = `
-      SELECT r.id, r.nombre_cliente, r.calificacion, r.comentario, r.respuesta,
+      SELECT r.id, r.nombre_cliente, r.mascota_nombre, r.calificacion, r.comentario, r.respuesta,
              r.destacada, r.creado_en
       FROM resenas r
       WHERE r.estado = 'aprobada'
@@ -186,12 +207,13 @@ module.exports = function createResenasRouter(db) {
 
   // Editar texto del comentario
   router.put('/:id', (req, res) => {
-    const { comentario, calificacion, nombre_cliente } = req.body;
+    const { comentario, calificacion, nombre_cliente, mascota_nombre } = req.body;
     const fields = [];
     const values = [];
     if (comentario !== undefined)     { fields.push('comentario = ?');     values.push(comentario); }
     if (calificacion !== undefined)   { fields.push('calificacion = ?');   values.push(Number(calificacion)); }
     if (nombre_cliente !== undefined) { fields.push('nombre_cliente = ?'); values.push(nombre_cliente); }
+    if (mascota_nombre !== undefined) { fields.push('mascota_nombre = ?'); values.push(mascota_nombre || null); }
 
     if (!fields.length) return res.status(400).json({ error: 'Nada para actualizar' });
 
