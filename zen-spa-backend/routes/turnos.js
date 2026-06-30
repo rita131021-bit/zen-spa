@@ -29,12 +29,15 @@ module.exports = (db) => {
         s.nombre as servicio_nombre,
         s.precio as servicio_precio,
         p.nombre as profesional_nombre,
+        l.nombre as local_nombre,
+        l.direccion as local_direccion,
         ca.nombre as canil_nombre
       FROM turnos t
       LEFT JOIN clientes c ON t.cliente_id = c.id
       LEFT JOIN mascotas m ON t.mascota_id = m.id
       LEFT JOIN servicios s ON t.servicio_id = s.id
       LEFT JOIN profesionales p ON t.profesional_id = p.id
+      LEFT JOIN locales l ON t.local_id = l.id
       LEFT JOIN caniles ca ON t.canil_id = ca.id
       ORDER BY t.fecha DESC, t.hora DESC
     `;
@@ -47,7 +50,8 @@ module.exports = (db) => {
 
   router.post('/', async (req, res) => {
     try {
-      const { cliente_id, mascota_id, servicio_id, profesional_id, canil_id, fecha, hora, fecha_egreso, hora_egreso, observaciones } = req.body;
+      await query(db, 'ALTER TABLE turnos ADD COLUMN IF NOT EXISTS local_id INTEGER');
+      const { cliente_id, mascota_id, servicio_id, profesional_id, canil_id, local_id, fecha, hora, fecha_egreso, hora_egreso, observaciones } = req.body;
 
       // Validaciones básicas
       if (!fecha || !hora) {
@@ -157,13 +161,13 @@ module.exports = (db) => {
       // ===== CREAR TURNO =====
       const sql = `
         INSERT INTO turnos
-          (cliente_id, mascota_id, servicio_id, profesional_id, canil_id, fecha, hora, fecha_egreso, hora_egreso, observaciones, estado, pago)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pendiente', 'Pendiente')
+          (cliente_id, mascota_id, servicio_id, profesional_id, canil_id, local_id, fecha, hora, fecha_egreso, hora_egreso, observaciones, estado, pago)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pendiente', 'Pendiente')
       `;
 
       db.query(
         sql,
-        [cliente_id, mascota_id, servicio_id, profesional_id || null, canil_id || null, fecha, hora, fecha_egreso || null, hora_egreso || null, observaciones || null],
+        [cliente_id, mascota_id, servicio_id, profesional_id || null, canil_id || null, local_id || null, fecha, hora, fecha_egreso || null, hora_egreso || null, observaciones || null],
         async (err, result) => {
           if (err) return res.status(500).json({ error: err.message });
 
@@ -177,12 +181,14 @@ module.exports = (db) => {
                 c.nombre as cliente_nombre, c.whatsapp as cliente_whatsapp,
                 m.nombre as mascota_nombre,
                 s.nombre as servicio_nombre,
-                p.nombre as profesional_nombre
+                p.nombre as profesional_nombre,
+                l.nombre as local_nombre
                FROM turnos t
                LEFT JOIN clientes c ON t.cliente_id = c.id
                LEFT JOIN mascotas m ON t.mascota_id = m.id
                LEFT JOIN servicios s ON t.servicio_id = s.id
                LEFT JOIN profesionales p ON t.profesional_id = p.id
+               LEFT JOIN locales l ON t.local_id = l.id
                WHERE t.id = ?`,
               [turnoId]
             );
