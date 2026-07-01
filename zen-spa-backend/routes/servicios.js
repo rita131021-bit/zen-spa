@@ -2,6 +2,16 @@
 module.exports = function createServiciosRouter(db) {
   const express = require('express');
   const router = express.Router();
+  const PRICE_ADMIN_PASSWORD = process.env.PRICE_ADMIN_PASSWORD || 'admin1234';
+
+  function validarClavePrecio(req, res) {
+    const clave = req.body?.password_precio || req.body?.clave_precio || req.body?.precio_password || '';
+    if (String(clave) !== PRICE_ADMIN_PASSWORD) {
+      res.status(401).json({ error: 'Contraseña incorrecta para modificar precios' });
+      return false;
+    }
+    return true;
+  }
 
   // GET TODOS
   router.get('/', (req, res) => {
@@ -21,6 +31,7 @@ module.exports = function createServiciosRouter(db) {
 
   // AUMENTO GENERAL DE PRECIOS — debe ir ANTES de /:id
   router.put('/precio/aumento', (req, res) => {
+    if (!validarClavePrecio(req, res)) return;
     const { porcentaje } = req.body;
     if (!porcentaje || porcentaje <= 0) {
       return res.status(400).json({ error: 'Porcentaje debe ser mayor a 0' });
@@ -61,6 +72,7 @@ module.exports = function createServiciosRouter(db) {
 
   // ACTUALIZAR
   router.put('/:id', (req, res) => {
+    if (!validarClavePrecio(req, res)) return;
     const { nombre, descripcion, precio, precio_base, duracion_minutos, categoria, activo } = req.body;
     const precioFinal = precio || precio_base;
 
