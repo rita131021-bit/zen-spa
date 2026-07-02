@@ -6,7 +6,9 @@ module.exports = function createServiciosRouter(db) {
 
   function validarClavePrecio(req, res) {
     const clave = req.body?.password_precio || req.body?.clave_precio || req.body?.precio_password || '';
-    if (String(clave) !== PRICE_ADMIN_PASSWORD) {
+    const claveNormalizada = String(clave).trim().toLowerCase();
+    const claveEsperada = String(PRICE_ADMIN_PASSWORD).trim().toLowerCase();
+    if (claveNormalizada !== claveEsperada) {
       res.status(401).json({ error: 'Contraseña incorrecta para modificar precios' });
       return false;
     }
