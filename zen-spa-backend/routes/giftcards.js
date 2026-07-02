@@ -3,6 +3,10 @@ module.exports = function createGiftCardsRouter(db) {
   const express = require('express');
   const router = express.Router();
 
+  function normalizarCodigo(codigo) {
+    return String(codigo || '').trim().replace(/\s+/g, '').toUpperCase();
+  }
+
   function generarCodigo() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let code = 'ZEN-';
@@ -30,7 +34,7 @@ module.exports = function createGiftCardsRouter(db) {
       FROM gift_cards g
       LEFT JOIN clientes c ON g.cliente_id = c.id
       WHERE g.codigo = ?`;
-    db.query(sql, [req.params.codigo.toUpperCase()], (err, results) => {
+    db.query(sql, [normalizarCodigo(req.params.codigo)], (err, results) => {
       if (err) return res.status(500).json({ error: err.message });
       if (!results.length) return res.status(404).json({ error: 'Gift card no encontrada' });
       res.json(results[0]);
@@ -57,7 +61,8 @@ module.exports = function createGiftCardsRouter(db) {
     if (!codigo || !monto_usar) return res.status(400).json({ error: 'Código y monto son obligatorios' });
 
     const sqlGet = 'SELECT * FROM gift_cards WHERE codigo = ? AND estado = "activa"';
-    db.query(sqlGet, [codigo.toUpperCase()], (err, results) => {
+    const codigoNormalizado = normalizarCodigo(codigo);
+    db.query(sqlGet, [codigoNormalizado], (err, results) => {
       if (err) return res.status(500).json({ error: err.message });
       if (!results.length) return res.status(404).json({ error: 'Gift card no encontrada o inactiva' });
 
