@@ -6,6 +6,63 @@ module.exports = function createBookingsRouter(db) {
   const express = require('express');
   const router = express.Router();
 
+  const PRICE_ADMIN_PASSWORD = process.env.PRICE_ADMIN_PASSWORD || 'admin1234';
+  const defaultWebPrices = [
+    ['spa-relax', '', 'por sesion'],
+    ['spa-armonia', '', 'por sesion'],
+    ['spa-premium', '', 'por sesion'],
+    ['ter-completo', '', 'por sesion'],
+    ['gua-canina', '', 'por dia'],
+    ['gua-felina', '', 'por dia'],
+    ['pel-canina', '', ''],
+    ['pel-felina', '', ''],
+    ['gc-relax', '', ''],
+    ['gc-armonia', '', ''],
+    ['gc-libre', '', ''],
+  ];
+
+  function isPricesMount(req) {
+    return String(req.baseUrl || '').endsWith('/api/prices');
+  }
+
+  function validarClavePrecio(req, res) {
+    const clave = req.body?.password_precio || req.body?.clave_precio || req.body?.precio_password || req.get('x-admin-password') || '';
+    if (String(clave) !== PRICE_ADMIN_PASSWORD) {
+      res.status(401).json({ error: 'Contraseña incorrecta para modificar precios' });
+      return false;
+    }
+    return true;
+  }
+
+  async function ensureWebPricesTable() {
+    await db.query(`CREATE TABLE IF NOT EXISTS web_prices (
+      id TEXT PRIMARY KEY,
+      price TEXT DEFAULT '',
+      price_note TEXT DEFAULT '',
+      sort_order INTEGER DEFAULT 0,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    for (let i = 0; i < defaultWebPrices.length; i += 1) {
+      const [id, price, priceNote] = defaultWebPrices[i];
+      await db.query(
+        `INSERT INTO web_prices (id, price, price_note, sort_order)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT (id) DO NOTHING`,
+        [id, price, priceNote, i]
+      );
+    }
+  }
+
+  async function listWebPrices(res) {
+    await ensureWebPricesTable();
+    const rows = await db.query(
+      'SELECT id, price, price_note AS "priceNote" FROM web_prices ORDER BY sort_order, id'
+    );
+    res.json(rows || []);
+  }
+
+
   // POST /api/bookings - crear reserva desde el sitio web
   router.post('/', async (req, res) => {
     try {
@@ -101,8 +158,11 @@ module.exports = function createBookingsRouter(db) {
   });
 
   // GET /api/bookings - listar reservas
+  // GET /api/prices - listar precios editables del sitio web
   router.get('/', async (req, res) => {
     try {
+      if (isPricesMount(req)) return await listWebPrices(res);
+
       const rows = await db.query(`
         SELECT t.*, c.nombre as cliente_nombre, m.nombre as mascota_nombre,
                s.nombre as servicio_nombre
@@ -143,11 +203,36 @@ module.exports = function createBookingsRouter(db) {
     }
   });
 
-  // GET /api/prices - precios de servicios
+  // GET /api/prices - precios de servicios web (cuando el router esta montado en /api/bookings)
   router.get('/prices', async (req, res) => {
     try {
-      const rows = await db.query('SELECT id, nombre, precio, categoria FROM servicios WHERE activo = TRUE');
-      res.json(rows || []);
+      return await listWebPrices(res);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // PUT /api/prices/:id - actualizar precio editable del sitio web
+  router.put('/:id', async (req, res, next) => {
+    if (!isPricesMount(req)) return next();
+    try {
+      if (!validarClavePrecio(req, res)) return;
+      await ensureWebPricesTable();
+      const id = String(req.params.id || '').trim();
+      const price = String(req.body?.price || req.body?.precio || '').trim();
+      const priceNote = String(req.body?.priceNote || req.body?.price_note || req.body?.nota || '').trim();
+      if (!id) return res.status(400).json({ error: 'ID de precio obligatorio' });
+
+      await db.query(
+        `INSERT INTO web_prices (id, price, price_note, updated_at)
+         VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+         ON CONFLICT (id) DO UPDATE SET
+           price = EXCLUDED.price,
+           price_note = EXCLUDED.price_note,
+           updated_at = CURRENT_TIMESTAMP`,
+        [id, price, priceNote]
+      );
+      res.json({ mensaje: 'Precio actualizado', id, price, priceNote });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
