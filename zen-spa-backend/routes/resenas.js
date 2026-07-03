@@ -34,11 +34,33 @@ module.exports = function createResenasRouter(db) {
     db.query('ALTER TABLE resenas ADD COLUMN IF NOT EXISTS mascota_nombre VARCHAR(100)', [], (err) => {
       if (err) console.error('No se pudo verificar mascota_nombre:', err.message);
     });
+    db.query('ALTER TABLE resenas_fotos ADD COLUMN IF NOT EXISTS data_url TEXT', [], (err) => {
+      if (err) console.error('No se pudo verificar data_url en resenas_fotos:', err.message);
+    });
     schemaReady = true;
   }
   ensureSchema();
 
-  // Servir las fotos estáticamente
+  // Servir fotos. Si Railway pierde el archivo local en un redeploy, usa la copia guardada en DB.
+  router.get('/fotos/:filename', (req, res, next) => {
+    const filename = path.basename(req.params.filename || '');
+    const filepath = path.join(uploadDir, filename);
+
+    if (fs.existsSync(filepath)) return res.sendFile(filepath);
+
+    const ruta = `/api/resenas/fotos/${filename}`;
+    db.query('SELECT data_url FROM resenas_fotos WHERE ruta_archivo = ? LIMIT 1', [ruta], (err, rows) => {
+      if (err) return next(err);
+      const dataUrl = rows?.[0]?.data_url;
+      const match = typeof dataUrl === 'string' ? dataUrl.match(/^data:([^;]+);base64,(.+)$/) : null;
+      if (!match) return res.status(404).json({ error: 'Foto no encontrada' });
+
+      res.setHeader('Content-Type', match[1]);
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      return res.send(Buffer.from(match[2], 'base64'));
+    });
+  });
+
   router.use('/fotos', express.static(uploadDir));
 
   // ---------------------------------------------------------------------
@@ -82,8 +104,16 @@ module.exports = function createResenasRouter(db) {
         return res.status(201).json({ mensaje: '✅ Reseña enviada, pendiente de aprobación', id: resenaId, fotos: [] });
       }
 
-      const values = files.map((f, i) => [resenaId, `/api/resenas/fotos/${f.filename}`, i]);
-      db.query('INSERT INTO resenas_fotos (resena_id, ruta_archivo, orden) VALUES ?', [values], (err2) => {
+      const values = files.map((f, i) => {
+        let dataUrl = null;
+        try {
+          dataUrl = `data:${f.mimetype};base64,${fs.readFileSync(f.path).toString('base64')}`;
+        } catch (readError) {
+          console.error('No se pudo respaldar foto de reseña:', readError.message);
+        }
+        return [resenaId, `/api/resenas/fotos/${f.filename}`, i, dataUrl];
+      });
+      db.query('INSERT INTO resenas_fotos (resena_id, ruta_archivo, orden, data_url) VALUES ?', [values], (err2) => {
         if (err2) return res.status(500).json({ error: err2.message });
         res.status(201).json({
           mensaje: '✅ Reseña enviada, pendiente de aprobación',
