@@ -60,7 +60,7 @@ module.exports = function createGiftCardsRouter(db) {
     const { codigo, monto_usar, turno_id, notas } = req.body;
     if (!codigo || !monto_usar) return res.status(400).json({ error: 'Código y monto son obligatorios' });
 
-    const sqlGet = 'SELECT * FROM gift_cards WHERE codigo = ? AND estado = "activa"';
+    const sqlGet = "SELECT * FROM gift_cards WHERE codigo = ? AND estado = 'activa'";
     const codigoNormalizado = normalizarCodigo(codigo);
     db.query(sqlGet, [codigoNormalizado], (err, results) => {
       if (err) return res.status(500).json({ error: err.message });
