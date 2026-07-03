@@ -36,7 +36,7 @@ module.exports = function createDogsRouter(db) {
     schemaQueue.push(done);
     if (schemaCreating) return;
     schemaCreating = true;
-    db.query('CREATE TABLE IF NOT EXISTS resultados_antes_despues (id SERIAL PRIMARY KEY, name VARCHAR(120) NOT NULL, service VARCHAR(180) NOT NULL, emoji VARCHAR(12) DEFAULT '🐾', antes TEXT NOT NULL, despues TEXT NOT NULL, combined TEXT, data_url_antes TEXT, data_url_despues TEXT, activo BOOLEAN DEFAULT TRUE, creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP)', [], (err) => {
+    db.query('CREATE TABLE IF NOT EXISTS resultados_antes_despues (id SERIAL PRIMARY KEY, name VARCHAR(120) NOT NULL, service VARCHAR(180) NOT NULL, emoji VARCHAR(12), antes TEXT NOT NULL, despues TEXT NOT NULL, combined TEXT, data_url_antes TEXT, data_url_despues TEXT, activo BOOLEAN DEFAULT TRUE, creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP)', [], (err) => {
       schemaCreating = false;
       if (err) console.error('No se pudo verificar resultados_antes_despues:', err.message);
       else schemaReady = true;
