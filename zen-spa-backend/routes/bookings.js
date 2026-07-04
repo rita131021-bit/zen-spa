@@ -25,6 +25,84 @@ module.exports = function createBookingsRouter(db) {
     return String(req.baseUrl || '').endsWith('/api/prices');
   }
 
+  function isAvailabilityMount(req) {
+    return String(req.baseUrl || '').endsWith('/api/availability');
+  }
+
+  const availabilityHours = ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00'];
+  const availabilityDays = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
+
+  function formatYmd(value) {
+    if (!value) return '';
+    if (typeof value === 'string') return value.slice(0, 10);
+    if (value instanceof Date) {
+      const year = value.getFullYear();
+      const month = String(value.getMonth() + 1).padStart(2, '0');
+      const day = String(value.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    return String(value).slice(0, 10);
+  }
+
+  function addBookedSlot(bookedSlots, fecha, hora) {
+    const day = formatYmd(fecha);
+    const slot = String(hora || '').slice(0, 5);
+    if (!day || !slot) return;
+    if (!bookedSlots[day]) bookedSlots[day] = [];
+    if (!bookedSlots[day].includes(slot)) bookedSlots[day].push(slot);
+  }
+
+  async function monthlyAvailability(month) {
+    if (!/^\d{4}-\d{2}$/.test(String(month || ''))) {
+      return { blockedDates: [], bookedSlots: {} };
+    }
+
+    const blockedRows = await db.query(
+      `SELECT fecha FROM bloqueos_calendario WHERE fecha::text LIKE ? ORDER BY fecha`,
+      [`${month}%`]
+    );
+    const blockedDates = (blockedRows || []).map((row) => formatYmd(row.fecha)).filter(Boolean);
+
+    const turnoRows = await db.query(
+      `SELECT fecha, hora
+       FROM turnos
+       WHERE fecha::text LIKE ? AND COALESCE(estado, '') != 'Cancelado'
+       ORDER BY fecha, hora`,
+      [`${month}%`]
+    );
+
+    const bookedSlots = {};
+    for (const row of (turnoRows || [])) addBookedSlot(bookedSlots, row.fecha, row.hora);
+
+    const horarioRows = await db.query(
+      `SELECT dia, hora, disponible FROM horarios ORDER BY dia, hora`
+    );
+    const unavailableByDay = new Map();
+    for (const row of (horarioRows || [])) {
+      if (row.disponible === true || row.disponible === 1 || row.disponible === '1') continue;
+      const hour = String(row.hora || '').slice(0, 5);
+      if (!hour) continue;
+      const key = String(row.dia || '');
+      if (!unavailableByDay.has(key)) unavailableByDay.set(key, new Set());
+      unavailableByDay.get(key).add(hour);
+    }
+
+    const [year, monthNumber] = String(month).split('-').map(Number);
+    const lastDay = new Date(year, monthNumber, 0).getDate();
+    for (let day = 1; day <= lastDay; day += 1) {
+      const date = new Date(year, monthNumber - 1, day);
+      const fecha = `${year}-${String(monthNumber).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      const unavailable = unavailableByDay.get(availabilityDays[date.getDay()]);
+      if (!unavailable) continue;
+      for (const hour of availabilityHours) {
+        if (unavailable.has(hour)) addBookedSlot(bookedSlots, fecha, hour);
+      }
+    }
+
+    for (const day of Object.keys(bookedSlots)) bookedSlots[day].sort();
+    return { blockedDates, bookedSlots };
+  }
+
   function validarClavePrecio(req, res) {
     const clave = req.body?.password_precio || req.body?.clave_precio || req.body?.precio_password || req.get('x-admin-password') || '';
     if (String(clave) !== PRICE_ADMIN_PASSWORD) {
@@ -162,6 +240,7 @@ module.exports = function createBookingsRouter(db) {
   router.get('/', async (req, res) => {
     try {
       if (isPricesMount(req)) return await listWebPrices(res);
+      if (isAvailabilityMount(req)) return res.json(await monthlyAvailability(req.query.month));
 
       const rows = await db.query(`
         SELECT t.*, c.nombre as cliente_nombre, m.nombre as mascota_nombre,
@@ -179,25 +258,10 @@ module.exports = function createBookingsRouter(db) {
     }
   });
 
-  // GET /api/availability - disponibilidad por mes
+  // GET /api/bookings/availability - disponibilidad mensual en formato web
   router.get('/availability', async (req, res) => {
     try {
-      const { month } = req.query; // formato: "2026-06"
-      if (!month) return res.json({});
-
-      const rows = await db.query(
-        `SELECT fecha, COUNT(*) as turnos
-         FROM turnos
-         WHERE fecha::text LIKE ? AND estado != 'Cancelado'
-         GROUP BY fecha`,
-        [`${month}%`]
-      );
-
-      const result = {};
-      for (const row of (rows || [])) {
-        result[row.fecha] = Number(row.turnos);
-      }
-      res.json(result);
+      res.json(await monthlyAvailability(req.query.month));
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
