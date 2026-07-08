@@ -135,7 +135,7 @@ module.exports = function createBookingsRouter(db) {
   async function listWebPrices(res) {
     await ensureWebPricesTable();
     const rows = await db.query(
-      'SELECT id, price, price_note AS "priceNote" FROM web_prices ORDER BY sort_order, id'
+      'SELECT id, price, price_note AS "priceNote", TRUE AS visible FROM web_prices ORDER BY sort_order, id'
     );
     res.json(rows || []);
   }
