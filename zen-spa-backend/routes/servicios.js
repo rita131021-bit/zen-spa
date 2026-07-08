@@ -15,20 +15,104 @@ module.exports = function createServiciosRouter(db) {
     return true;
   }
 
+  function normalizarTexto(valor) {
+    return String(valor || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+  }
+
+  async function ensureCatalogoServicios() {
+    const servicios = (await db.query('SELECT * FROM servicios')) || [];
+    const buscar = (predicado) => servicios.find((servicio) =>
+      predicado(normalizarTexto(servicio.nombre), normalizarTexto(servicio.categoria), servicio)
+    );
+
+    const banoSimple = buscar((nombre) => nombre === 'bano simple');
+    if (banoSimple) {
+      await db.query(
+        'UPDATE servicios SET nombre = ?, descripcion = ?, categoria = ? WHERE id = ?',
+        [
+          'Baño + limpieza de orejas + cortes de uñas',
+          'Baño completo con limpieza de orejas y cortes de uñas',
+          'peluqueria',
+          banoSimple.id,
+        ]
+      );
+      banoSimple.nombre = 'Baño + limpieza de orejas + cortes de uñas';
+      banoSimple.descripcion = 'Baño completo con limpieza de orejas y cortes de uñas';
+      banoSimple.categoria = 'peluqueria';
+    }
+
+    const peluqueriaCaninaExistente = buscar((nombre) => nombre === 'peluqueria canina');
+    const peluqueriaBase = buscar((nombre, categoria) =>
+      !peluqueriaCaninaExistente &&
+      categoria.includes('peluqueria') &&
+      (nombre.includes('peluqueria simple') || nombre.includes('peluqueria basica'))
+    );
+    const caninaTemplate = peluqueriaCaninaExistente || peluqueriaBase || buscar((nombre, categoria) => categoria.includes('peluqueria'));
+
+    if (peluqueriaBase) {
+      await db.query(
+        'UPDATE servicios SET nombre = ?, descripcion = ?, categoria = ? WHERE id = ?',
+        ['Peluquería Canina', peluqueriaBase.descripcion || 'Baño y arreglo para perros', 'peluqueria', peluqueriaBase.id]
+      );
+      peluqueriaBase.nombre = 'Peluquería Canina';
+      peluqueriaBase.categoria = 'peluqueria';
+    }
+
+    const peluqueriaFelina = buscar((nombre) => nombre === 'peluqueria felina');
+    if (!peluqueriaFelina) {
+      await db.query(
+        'INSERT INTO servicios (nombre, descripcion, precio, duracion_minutos, categoria, activo) VALUES (?, ?, ?, ?, ?, TRUE)',
+        [
+          'Peluquería Felina',
+          'Baño y arreglo para gatos',
+          Number(caninaTemplate?.precio || 0),
+          Number(caninaTemplate?.duracion_minutos || 120),
+          'peluqueria',
+        ]
+      );
+    }
+
+    const guarderiaCanina = buscar((nombre) => nombre === 'guarderia canina');
+    const guarderiaFelina = buscar((nombre) => nombre === 'guarderia felina');
+    if (!guarderiaFelina) {
+      await db.query(
+        'INSERT INTO servicios (nombre, descripcion, precio, duracion_minutos, categoria, activo) VALUES (?, ?, ?, ?, ?, TRUE)',
+        [
+          'Guarderia Felina',
+          'Cuidado y estadía para gatos',
+          Number(guarderiaCanina?.precio || 0),
+          Number(guarderiaCanina?.duracion_minutos || 480),
+          'guarderia',
+        ]
+      );
+    }
+  }
+
+
   // GET TODOS
-  router.get('/', (req, res) => {
-    db.query('SELECT * FROM servicios ORDER BY categoria, nombre', (err, results) => {
-      if (err) return res.status(500).json({ error: err.message });
+  router.get('/', async (req, res) => {
+    try {
+      await ensureCatalogoServicios();
+      const results = await db.query('SELECT * FROM servicios ORDER BY categoria, nombre');
       res.json(results || []);
-    });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // GET ACTIVOS
-  router.get('/activos/true', (req, res) => {
-    db.query('SELECT * FROM servicios WHERE activo = TRUE ORDER BY categoria, nombre', (err, results) => {
-      if (err) return res.status(500).json({ error: err.message });
+  router.get('/activos/true', async (req, res) => {
+    try {
+      await ensureCatalogoServicios();
+      const results = await db.query('SELECT * FROM servicios WHERE activo = TRUE ORDER BY categoria, nombre');
       res.json(results || []);
-    });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // AUMENTO GENERAL DE PRECIOS — debe ir ANTES de /:id
