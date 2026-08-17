@@ -1,0 +1,30 @@
+name: Execute Database Schema
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'zen-spa-backend/migrations/pg-schema.sql'
+
+jobs:
+  execute-schema:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      
+      - name: Execute database schema
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          echo "Executing database schema..."
+          psql "$DATABASE_URL" -f zen-spa-backend/migrations/pg-schema.sql
+          echo "Schema executed successfully!"
