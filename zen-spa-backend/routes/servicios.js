@@ -2,25 +2,122 @@
 module.exports = function createServiciosRouter(db) {
   const express = require('express');
   const router = express.Router();
+  const PRICE_ADMIN_PASSWORD = process.env.PRICE_ADMIN_PASSWORD || 'admin1234';
+
+  function validarClavePrecio(req, res) {
+    const clave = req.body?.password_precio || req.body?.clave_precio || req.body?.precio_password || '';
+    const claveNormalizada = String(clave).trim().toLowerCase();
+    const claveEsperada = String(PRICE_ADMIN_PASSWORD).trim().toLowerCase();
+    if (claveNormalizada !== claveEsperada) {
+      res.status(401).json({ error: 'Contraseña incorrecta para modificar precios' });
+      return false;
+    }
+    return true;
+  }
+
+  function normalizarTexto(valor) {
+    return String(valor || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+  }
+
+  async function ensureCatalogoServicios() {
+    const servicios = (await db.query('SELECT * FROM servicios')) || [];
+    const buscar = (predicado) => servicios.find((servicio) =>
+      predicado(normalizarTexto(servicio.nombre), normalizarTexto(servicio.categoria), servicio)
+    );
+
+    const banoSimple = buscar((nombre) => nombre === 'bano simple');
+    if (banoSimple) {
+      await db.query(
+        'UPDATE servicios SET nombre = ?, descripcion = ?, categoria = ? WHERE id = ?',
+        [
+          'Baño + limpieza de orejas + cortes de uñas',
+          'Baño completo con limpieza de orejas y cortes de uñas',
+          'peluqueria',
+          banoSimple.id,
+        ]
+      );
+      banoSimple.nombre = 'Baño + limpieza de orejas + cortes de uñas';
+      banoSimple.descripcion = 'Baño completo con limpieza de orejas y cortes de uñas';
+      banoSimple.categoria = 'peluqueria';
+    }
+
+    const peluqueriaCaninaExistente = buscar((nombre) => nombre === 'peluqueria canina');
+    const peluqueriaBase = buscar((nombre, categoria) =>
+      !peluqueriaCaninaExistente &&
+      categoria.includes('peluqueria') &&
+      (nombre.includes('peluqueria simple') || nombre.includes('peluqueria basica'))
+    );
+    const caninaTemplate = peluqueriaCaninaExistente || peluqueriaBase || buscar((nombre, categoria) => categoria.includes('peluqueria'));
+
+    if (peluqueriaBase) {
+      await db.query(
+        'UPDATE servicios SET nombre = ?, descripcion = ?, categoria = ? WHERE id = ?',
+        ['Peluquería Canina', peluqueriaBase.descripcion || 'Baño y arreglo para perros', 'peluqueria', peluqueriaBase.id]
+      );
+      peluqueriaBase.nombre = 'Peluquería Canina';
+      peluqueriaBase.categoria = 'peluqueria';
+    }
+
+    const peluqueriaFelina = buscar((nombre) => nombre === 'peluqueria felina');
+    if (!peluqueriaFelina) {
+      await db.query(
+        'INSERT INTO servicios (nombre, descripcion, precio, duracion_minutos, categoria, activo) VALUES (?, ?, ?, ?, ?, TRUE)',
+        [
+          'Peluquería Felina',
+          'Baño y arreglo para gatos',
+          Number(caninaTemplate?.precio || 0),
+          Number(caninaTemplate?.duracion_minutos || 120),
+          'peluqueria',
+        ]
+      );
+    }
+
+    const guarderiaCanina = buscar((nombre) => nombre === 'guarderia canina');
+    const guarderiaFelina = buscar((nombre) => nombre === 'guarderia felina');
+    if (!guarderiaFelina) {
+      await db.query(
+        'INSERT INTO servicios (nombre, descripcion, precio, duracion_minutos, categoria, activo) VALUES (?, ?, ?, ?, ?, TRUE)',
+        [
+          'Guarderia Felina',
+          'Cuidado y estadía para gatos',
+          Number(guarderiaCanina?.precio || 0),
+          Number(guarderiaCanina?.duracion_minutos || 480),
+          'guarderia',
+        ]
+      );
+    }
+  }
+
 
   // GET TODOS
-  router.get('/', (req, res) => {
-    db.query('SELECT * FROM servicios ORDER BY categoria, nombre', (err, results) => {
-      if (err) return res.status(500).json({ error: err.message });
+  router.get('/', async (req, res) => {
+    try {
+      await ensureCatalogoServicios();
+      const results = await db.query('SELECT * FROM servicios ORDER BY categoria, nombre');
       res.json(results || []);
-    });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // GET ACTIVOS
-  router.get('/activos/true', (req, res) => {
-    db.query('SELECT * FROM servicios WHERE activo = TRUE ORDER BY categoria, nombre', (err, results) => {
-      if (err) return res.status(500).json({ error: err.message });
+  router.get('/activos/true', async (req, res) => {
+    try {
+      await ensureCatalogoServicios();
+      const results = await db.query('SELECT * FROM servicios WHERE activo = TRUE ORDER BY categoria, nombre');
       res.json(results || []);
-    });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
   });
 
   // AUMENTO GENERAL DE PRECIOS — debe ir ANTES de /:id
   router.put('/precio/aumento', (req, res) => {
+    if (!validarClavePrecio(req, res)) return;
     const { porcentaje } = req.body;
     if (!porcentaje || porcentaje <= 0) {
       return res.status(400).json({ error: 'Porcentaje debe ser mayor a 0' });
@@ -61,6 +158,7 @@ module.exports = function createServiciosRouter(db) {
 
   // ACTUALIZAR
   router.put('/:id', (req, res) => {
+    if (!validarClavePrecio(req, res)) return;
     const { nombre, descripcion, precio, precio_base, duracion_minutos, categoria, activo } = req.body;
     const precioFinal = precio || precio_base;
 
